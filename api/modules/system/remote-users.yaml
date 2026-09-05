@@ -1,0 +1,195 @@
+# Legacy remote-API users - CRUD over the `remote_user` table, which gates
+# ISPConfig's OTHER API (interface/web/remote/index.php, the legacy
+# SOAP-style remoting_lib with ~140 client/dns/mail/sites/openvz
+# functions). Distinct from this REST API's own ApiKey/X-API-Key auth -
+# see api/components/schemas/RemoteUser.yaml.
+#
+# Datalog note: legacy maintains this table with direct SQL (remote/index.php
+# reads it at request time, no server daemon consumes sys_datalog for it);
+# the API journals writes through sys_datalog anyway (Principle II
+# superset, same documented shape as dns-cas.yaml/dns_ssl_ca).
+/system/remote-users:
+  get:
+    tags: [System]
+    summary: List legacy remote-API users
+    description: |
+      Retrieve a paginated list of accounts for ISPConfig's legacy
+      remote/SOAP API (remote_user table).
+    parameters:
+      - $ref: '../../components/parameters/limit.yaml'
+      - $ref: '../../components/parameters/offset.yaml'
+      - $ref: '../../components/parameters/sort.yaml'
+      - $ref: '../../components/parameters/order.yaml'
+      - name: remote_access
+        in: query
+        description: Filter by whether the account may authenticate
+        schema:
+          type: boolean
+    responses:
+      '200':
+        description: List of remote users retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+                - meta
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../../components/schemas/RemoteUser.yaml'
+                meta:
+                  $ref: '../../components/schemas/Meta.yaml'
+      '400':
+        $ref: '../../components/responses/BadRequest.yaml'
+      '401':
+        $ref: '../../components/responses/Unauthorized.yaml'
+      '403':
+        $ref: '../../components/responses/Forbidden.yaml'
+      '500':
+        $ref: '../../components/responses/InternalServerError.yaml'
+
+  post:
+    tags: [System]
+    summary: Create a legacy remote-API user
+    description: |
+      Create a new account for ISPConfig's legacy remote/SOAP API.
+
+      ### Validation rules
+      - `remote_username` and `remote_password` are required
+      - `remote_password` is at least 8 characters, write-only, hashed
+        with PHP's password_hash() (bcrypt on ISPConfig 3.3.1)
+      - `remote_username` must be unique (enforced by this API) -
+        duplicates are rejected with 409
+      - `remote_ips` entries must be valid IP addresses
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/schemas/RemoteUser.yaml'
+    responses:
+      '201':
+        description: Remote user created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/RemoteUser.yaml'
+      '400':
+        $ref: '../../components/responses/BadRequest.yaml'
+      '401':
+        $ref: '../../components/responses/Unauthorized.yaml'
+      '403':
+        $ref: '../../components/responses/Forbidden.yaml'
+      '409':
+        $ref: '../../components/responses/Conflict.yaml'
+      '422':
+        $ref: '../../components/responses/UnprocessableEntity.yaml'
+      '500':
+        $ref: '../../components/responses/InternalServerError.yaml'
+
+/system/remote-users/{id}:
+  get:
+    tags: [System]
+    summary: Get a legacy remote-API user
+    description: Retrieve a specific legacy remote-API user account
+    parameters:
+      - name: id
+        in: path
+        description: ID of the remote user
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: Remote user retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/RemoteUser.yaml'
+      '401':
+        $ref: '../../components/responses/Unauthorized.yaml'
+      '403':
+        $ref: '../../components/responses/Forbidden.yaml'
+      '404':
+        $ref: '../../components/responses/NotFound.yaml'
+      '500':
+        $ref: '../../components/responses/InternalServerError.yaml'
+
+  put:
+    tags: [System]
+    summary: Update a legacy remote-API user
+    description: |
+      Update an existing legacy remote-API user account. Keys absent from
+      the request are left unchanged; an omitted or empty
+      `remote_password` keeps the stored hash.
+
+      Changing `remote_username` to a value used by another account is
+      rejected with 409.
+
+      Typical use: appending a self-hosted node's own hairpin address to
+      `remote_ips` without disturbing any IP already there (client sends
+      the full desired array; the server does not merge automatically -
+      GET first, then PUT the union).
+    parameters:
+      - name: id
+        in: path
+        description: ID of the remote user
+        required: true
+        schema:
+          type: integer
+          format: int64
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/schemas/RemoteUser.yaml'
+    responses:
+      '200':
+        description: Remote user updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/RemoteUser.yaml'
+      '400':
+        $ref: '../../components/responses/BadRequest.yaml'
+      '401':
+        $ref: '../../components/responses/Unauthorized.yaml'
+      '403':
+        $ref: '../../components/responses/Forbidden.yaml'
+      '404':
+        $ref: '../../components/responses/NotFound.yaml'
+      '409':
+        $ref: '../../components/responses/Conflict.yaml'
+      '422':
+        $ref: '../../components/responses/UnprocessableEntity.yaml'
+      '500':
+        $ref: '../../components/responses/InternalServerError.yaml'
+
+  delete:
+    tags: [System]
+    summary: Delete a legacy remote-API user
+    description: Remove a legacy remote-API user account.
+    parameters:
+      - name: id
+        in: path
+        description: ID of the remote user
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '204':
+        description: Remote user deleted successfully
+      '401':
+        $ref: '../../components/responses/Unauthorized.yaml'
+      '403':
+        $ref: '../../components/responses/Forbidden.yaml'
+      '404':
+        $ref: '../../components/responses/NotFound.yaml'
+      '500':
+        $ref: '../../components/responses/InternalServerError.yaml'

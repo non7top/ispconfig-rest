@@ -51,6 +51,31 @@ class LegacyCrypt
     }
 
     /**
+     * remote_user.remote_password's format - the one field in this class
+     * that is NOT a port. remote_user_edit.php hashes with PHP's own
+     * password_hash($password, PASSWORD_DEFAULT), which on the fleet's
+     * ISPConfig 3.3.1 produces bcrypt ('$2y$'). Calling the same builtin
+     * PHP calls is inherently byte-compatible - there is nothing to port.
+     *
+     * Not verified here against source_code/ (untracked, not present in
+     * this checkout); this is wr-salt-new's own finding, checked directly
+     * against a live node's remote_user row (see wr-salt-new's
+     * ispconfig3/server_roles.sls, ispconfig_remote_api_user).
+     */
+    public static function passwordHash(string $cleartextPassword): string
+    {
+        return password_hash($cleartextPassword, PASSWORD_DEFAULT);
+    }
+
+    /**
+     * Verify a cleartext password against a stored remote_user.remote_password hash.
+     */
+    public static function verifyPasswordHash(string $cleartextPassword, string $hash): bool
+    {
+        return password_verify($cleartextPassword, $hash);
+    }
+
+    /**
      * Verify a cleartext password against a stored CRYPTMAIL hash.
      */
     public static function verifyMail(string $cleartextPassword, string $hash): bool

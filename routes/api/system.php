@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\DirectiveSnippetController;
 use App\Http\Controllers\Api\V1\DnsCaController;
+use App\Http\Controllers\Api\V1\RemoteUserController;
 use App\Http\Controllers\Api\V1\ResyncController;
 use App\Http\Controllers\Api\V1\SystemConfigController;
 use Illuminate\Support\Facades\Route;
@@ -43,3 +44,10 @@ Route::delete('system/directive-snippets/{directiveSnippet}', [DirectiveSnippetC
 // Resync — api/modules/system/resync.yaml ('servers' before the action path)
 Route::get('system/resync/servers', [ResyncController::class, 'servers']);
 Route::post('system/resync', [ResyncController::class, 'store']);
+
+// Legacy remote-API users (remote_user) — api/modules/system/remote-users.yaml
+Route::get('system/remote-users', [RemoteUserController::class, 'index']);
+Route::post('system/remote-users', [RemoteUserController::class, 'store']);
+Route::get('system/remote-users/{remoteUser}', [RemoteUserController::class, 'show'])->whereNumber('remoteUser');
+Route::put('system/remote-users/{remoteUser}', [RemoteUserController::class, 'update'])->whereNumber('remoteUser');
+Route::delete('system/remote-users/{remoteUser}', [RemoteUserController::class, 'destroy'])->whereNumber('remoteUser');

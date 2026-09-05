@@ -35,3 +35,7 @@ directive-snippets:
 # Service resynchronization
 resync:
   $ref: './resync.yaml'
+
+# Legacy remote-API users (remote_user)
+remote-users:
+  $ref: './remote-users.yaml'

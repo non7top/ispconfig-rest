@@ -64,6 +64,26 @@ class SystemSchema
             });
         }
 
+        // Column set from wr-salt-new's ispconfig3/server_roles.sls
+        // (ispconfig_remote_api_user), checked against two live ISPConfig
+        // 3.3.1 nodes' real remote_user rows - not independently verified
+        // here against source_code/install/sql/ispconfig3.sql.
+        if (! Schema::hasTable('remote_user')) {
+            Schema::create('remote_user', function (Blueprint $table): void {
+                $table->increments('remote_userid');
+                $table->unsignedInteger('sys_userid')->default(0);
+                $table->unsignedInteger('sys_groupid')->default(0);
+                $table->string('sys_perm_user', 5)->default('');
+                $table->string('sys_perm_group', 5)->default('');
+                $table->string('sys_perm_other', 5)->default('');
+                $table->string('remote_username')->default('');
+                $table->string('remote_password')->default('');
+                $table->string('remote_access', 1)->default('n');
+                $table->text('remote_ips');
+                $table->text('remote_functions');
+            });
+        }
+
         if (! Schema::hasTable('web_domain')) {
             Schema::create('web_domain', function (Blueprint $table): void {
                 $table->increments('domain_id');

@@ -170,6 +170,8 @@ components:
       $ref: './components/schemas/SystemMiscConfig.yaml'
     SystemSitesConfig:
       $ref: './components/schemas/SystemSitesConfig.yaml'
+    RemoteUser:
+      $ref: './components/schemas/RemoteUser.yaml'
     WebChildDomain:
       $ref: './components/schemas/WebChildDomain.yaml'
     WebDavUser:
@@ -180,7 +182,7 @@ components:
       $ref: './components/schemas/WebFolder.yaml'
     WebFolderUser:
       $ref: './components/schemas/WebFolderUser.yaml'
-  
+
   # Reusable parameters
   parameters:
     limit:
@@ -191,7 +193,7 @@ components:
       $ref: './components/parameters/sort.yaml'
     order:
       $ref: './components/parameters/order.yaml'
-  
+
   # Reusable responses
   responses:
     BadRequest:
@@ -236,7 +238,7 @@ paths:
     $ref: './modules/client/resellers.yaml#/~1resellers'
   /resellers/{id}:
     $ref: './modules/client/resellers.yaml#/~1resellers~1{id}'
-  
+
   # DNS module paths
   /dns/records:
     $ref: './modules/dns/records.yaml#/~1dns~1records'
@@ -254,7 +256,7 @@ paths:
     $ref: './modules/dns/template.yaml#/~1dns~1templates'
   /dns/templates/{id}:
     $ref: './modules/dns/template.yaml#/~1dns~1templates~1{id}'
-  
+
   # Mail module paths
   /mail/domains:
     $ref: './modules/mail/domains.yaml#/~1mail~1domains'
@@ -324,7 +326,7 @@ paths:
     $ref: './modules/mail/access-rules.yaml#/~1mail~1access-rules'
   /mail/access-rules/{id}:
     $ref: './modules/mail/access-rules.yaml#/~1mail~1access-rules~1{id}'
-  
+
   # Server module paths
   /servers:
     $ref: './modules/server/servers.yaml#/~1servers'
@@ -368,7 +370,7 @@ paths:
     $ref: './modules/server/php-versions.yaml#/~1servers~1{id}~1php-versions'
   /servers/{id}/php-versions/{php_version_id}:
     $ref: './modules/server/php-versions.yaml#/~1servers~1{id}~1php-versions~1{php_version_id}'
-    
+
   # System module paths
   /system/config:
     $ref: './modules/system/system-config.yaml#/~1system~1config'
@@ -394,6 +396,10 @@ paths:
     $ref: './modules/system/resync.yaml#/~1system~1resync'
   /system/resync/servers:
     $ref: './modules/system/resync.yaml#/~1system~1resync~1servers'
+  /system/remote-users:
+    $ref: './modules/system/remote-users.yaml#/~1system~1remote-users'
+  /system/remote-users/{id}:
+    $ref: './modules/system/remote-users.yaml#/~1system~1remote-users~1{id}'
 
   # Sites module paths
   /sites/web-domains:
@@ -440,7 +446,7 @@ paths:
     $ref: './modules/sites/cron-jobs.yaml#/~1sites~1cron-jobs'
   /sites/cron-jobs/{id}:
     $ref: './modules/sites/cron-jobs.yaml#/~1sites~1cron-jobs~1{id}'
-    
+
   # Monitor module paths
   /monitor/servers/status:
     $ref: './modules/monitor/server-status.yaml#/~1monitor~1servers~1status'

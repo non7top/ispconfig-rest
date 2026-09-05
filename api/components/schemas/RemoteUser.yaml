@@ -1,0 +1,80 @@
+# An account for ISPConfig's LEGACY remote/SOAP API
+# (interface/web/remote/index.php), backed by table `remote_user`.
+# Column set taken from wr-salt-new's ispconfig3/server_roles.sls
+# (ispconfig_remote_api_user), itself checked against two live ISPConfig
+# 3.3.1 nodes' real remote_user rows - NOT independently verified here
+# against source_code/install/sql/ispconfig3.sql (untracked, not present in
+# this checkout).
+#
+# This is a DIFFERENT auth system from this REST API's own (ApiKey/
+# api_keys, X-API-Key): remote_user gates remote/index.php's ~140-function
+# SOAP-style API (client/dns/mail/sites/openvz CRUD), which this REST API
+# does not wrap. This resource lets an admin manage THAT API's accounts
+# through THIS one - it does not change how anyone authenticates to THIS
+# API.
+#
+# Datalog note: legacy's remote/index.php reads this table directly at
+# request time; no server daemon consumes sys_datalog for it. The API
+# journals writes through sys_datalog anyway (BaseModel, Principle II
+# superset - same documented shape as DnsCaConfig.yaml/dns_ssl_ca).
+#
+# remote_username uniqueness (409 on conflict) is an invariant this API
+# enforces, not a confirmed DB UNIQUE KEY (same caveat as the column set).
+type: object
+x-db-table: remote_user
+description: >
+  An account for ISPConfig's legacy remote/SOAP API (remote_user table) -
+  distinct from this REST API's own API-key authentication.
+required:
+  - remote_username
+properties:
+  id:
+    type: integer
+    format: int64
+    description: Unique identifier (remote_user.remote_userid)
+    readOnly: true
+    example: 1
+    x-db-field: remote_userid
+  remote_username:
+    type: string
+    maxLength: 255
+    description: Login name presented to remote/index.php
+    example: admin
+    x-db-field: remote_username
+  remote_password:
+    type: string
+    writeOnly: true
+    minLength: 8
+    description: >
+      Cleartext password, write-only. Hashed with PHP's own
+      password_hash($password, PASSWORD_DEFAULT) before storage (bcrypt on
+      ISPConfig 3.3.1) - never returned by any endpoint. Omit on update to
+      keep the stored hash.
+    x-db-field: remote_password
+  remote_access:
+    type: boolean
+    description: Whether this account may authenticate at all
+    default: false
+    example: true
+    x-db-field: remote_access
+  remote_ips:
+    type: array
+    items:
+      type: string
+      format: ipv4
+    description: >
+      Source-IP allowlist for this account. Empty array = accepted from
+      anywhere (legacy stores this as a comma-separated string; empty
+      string means unrestricted).
+    example: ["127.0.0.1", "37.143.8.131"]
+    x-db-field: remote_ips
+  remote_functions:
+    type: array
+    items:
+      type: string
+    description: >
+      remoting_lib function names this account may call (e.g.
+      client_add, sites_web_domain_add). Empty array = no functions
+      granted.
+    example: ["client_add", "sites_web_domain_add"]
+    x-db-field: remote_functions
