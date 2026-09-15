@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\WebDomain;
+use App\Services\LetsEncryptStatusService;
 use App\Services\WebDomainService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,15 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 class WebDomainSslController extends Controller
 {
     public function __construct(protected WebDomainService $service) {}
+
+    /**
+     * GET /sites/web-domains/{id}/ssl/status — Let's Encrypt issuance outcome
+     * (spec 022); read-only, no plan gate.
+     */
+    public function status(WebDomain $webDomain, LetsEncryptStatusService $letsEncrypt): JsonResponse
+    {
+        return response()->json($letsEncrypt->status($webDomain));
+    }
 
     /**
      * GET /sites/web-domains/{id}/ssl — 200 with the stored PEM material,
