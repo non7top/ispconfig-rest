@@ -221,3 +221,6 @@ Change:
 
 ChangeSet:
   $ref: './ChangeSet.yaml'
+
+WebDomainSslStatus:
+  $ref: './WebDomainSslStatus.yaml'
