@@ -106,7 +106,7 @@ A consumer reads a server's full configuration or a single section (mail, web, d
 1. **Given** server 1 with a populated config blob, **When** the consumer calls `GET /servers/1/configs`, **Then** 200 with the parsed configuration.
 2. **Given** a `PUT /servers/1/configs/mail` changing `mailbox_size_limit`, **Then** the whole blob is read, only the `[mail]` section replaced, the blob re-serialized, and a datalog `u` on table `server` (field `config`) is written — mirroring `server_config_edit.php::onUpdateSave`.
 3. **Given** `mailbox_size_limit` nonzero and smaller than `message_size_limit`, **When** PUT to the mail section, **Then** 422 (legacy `onSubmit` check).
-4. **Given** a PUT to any section, **Then** keys absent from the request that legacy treats as checkboxes are written with their unchecked value, and `rspamd_available` is never accepted from the client (preserved from the existing blob, legacy behavior).
+4. **Given** a PUT to any section, **Then** keys absent from the request keep their stored value, checkboxes included, and `rspamd_available` is never accepted from the client (preserved from the existing blob, legacy behavior).
 
 ---
 
@@ -229,7 +229,13 @@ Notes on what the YAML actually allows:
 
 - **Tables written (via datalog only)**: `server` (i/u/d for server records; u with the `config` field for all configuration endpoints), `server_ip` (i/u/d), `server_ip_map` (i/u/d), `firewall` (i/u/d), `server_php` (i/u/d). Config side effect may additionally touch `spamfilter_users` / `spamfilter_wblist` (u) — see FR-051.
 - **System fields handling**: all five tables carry `sys_userid`, `sys_groupid`, `sys_perm_*`. Defaults per legacy auth_presets: perms `riud`/`riud`/`''` everywhere; `sys_groupid=1` for `server`, caller's group otherwise (API default: 1/admin, consistent with existing controllers). For nested resources `server_id` comes from the URL path, not the body. For the `server` table itself, `server_id` is the primary key, so `BaseModel` will naturally stamp the datalog row's `server_id` with the record's own id — matching legacy.
-- **Intentional deviations from legacy**: (1) permission model — legacy gates this module behind interface-admin login + `admin_allow_server_services`/`admin_allow_server_config`; the API uses the global `X-API-Key` middleware with no per-module ACL, same as every implemented module. (2) The nginx-hides-fastcgi/vlogger-tabs behavior is UI-only and is not replicated (sections stay readable/writable regardless of `server_type`). (3) The `getmail` config section has no endpoint (contract omits it) — it remains present and untouched inside the blob.
+
+### Intentional deviations from legacy
+
+1. Permission model — legacy gates this module behind interface-admin login + `admin_allow_server_services`/`admin_allow_server_config`; the API uses the global `X-API-Key` middleware with no per-module ACL, same as every implemented module.
+2. The nginx-hides-fastcgi/vlogger-tabs behavior is UI-only and is not replicated (sections stay readable/writable regardless of `server_type`).
+3. The `getmail` config section has no endpoint (contract omits it) — it remains present and untouched inside the blob.
+4. A PUT changes only the keys it submits: an omitted checkbox keeps its stored value instead of being backfilled with `n` as legacy's form save does (same rule as spec 008's system config), so saving one setting cannot switch off the others.
 
 ## Requirements *(mandatory)*
 

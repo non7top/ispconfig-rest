@@ -15,8 +15,7 @@
 #   3. re-serialize with ISPConfig-compatible output and datalog-update the
 #      `server` row's `config` field (action 'u' on table `server`).
 # Within the updated section, omitted text/select keys keep their current
-# value; omitted checkbox keys are written with their unchecked value,
-# mirroring legacy form semantics.
+# value, checkboxes included (only the submitted keys change).
 
 # Main server configuration endpoints
 /servers/{id}/configs:
@@ -98,7 +97,7 @@
       Replaces only the [server] section inside the configuration blob
       (read-merge-write, datalog update on the `server` row's `config`
       field; all other sections are preserved byte-for-byte). Omitted
-      checkbox keys are written with their unchecked value ('n').
+      checkbox keys keep their stored value.
     operationId: updateServerServerConfig
     parameters:
       - name: id
@@ -262,7 +261,7 @@
       - Switching `content_filter` to rspamd datalog-touches every
         spamfilter_users and spamfilter_wblist row of this server to trigger
         re-sync (legacy onAfterUpdate).
-      - Omitted checkbox keys are written with their unchecked value ('n').
+      - Omitted checkbox keys keep their stored value.
     operationId: updateServerMailConfig
     parameters:
       - name: id
@@ -340,7 +339,7 @@
       Replaces only the [web] section inside the configuration blob
       (read-merge-write, datalog update on the `server` row's `config`
       field; all other sections are preserved byte-for-byte). Omitted
-      checkbox keys are written with their unchecked value ('n').
+      checkbox keys keep their stored value.
     operationId: updateServerWebConfig
     parameters:
       - name: id
@@ -418,7 +417,7 @@
       Replaces only the [dns] section inside the configuration blob
       (read-merge-write, datalog update on the `server` row's `config`
       field; all other sections are preserved byte-for-byte). Omitted
-      checkbox keys are written with their unchecked value ('n').
+      checkbox keys keep their stored value.
     operationId: updateServerDnsConfig
     parameters:
       - name: id
@@ -573,7 +572,7 @@
       Replaces only the [xmpp] section inside the configuration blob
       (read-merge-write, datalog update on the `server` row's `config`
       field; all other sections are preserved byte-for-byte). Omitted
-      checkbox keys are written with their unchecked value ('n').
+      checkbox keys keep their stored value.
     operationId: updateServerXmppConfig
     parameters:
       - name: id
@@ -882,7 +881,7 @@
       Replaces only the [rescue] section inside the configuration blob
       (read-merge-write, datalog update on the `server` row's `config`
       field; all other sections are preserved byte-for-byte). Omitted
-      checkbox keys are written with their unchecked value ('n').
+      checkbox keys keep their stored value.
     operationId: updateServerRescueConfig
     parameters:
       - name: id
