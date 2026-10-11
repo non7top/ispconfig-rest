@@ -172,8 +172,8 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T038 [P] Update `README.md`: the Requirements line points at `ISPCONFIG_COMPAT` instead of repeating versions; document `/livez`, `/readyz`, `GET /api/v1/status`, `ispconfig-rest doctor`, the `incompatible-ispconfig-schema` problem and the log location `/var/log/ispconfig-rest/`
-- [ ] T039 Amend the constitution through `/speckit-constitution`: record the unauthenticated probe routes, and `/readyz` answering 503, as the documented exception to Principles IV and V (plan Complexity Tracking)
+- [x] T038 [P] Update `README.md`: the Requirements line points at `ISPCONFIG_COMPAT` instead of repeating versions; document `/livez`, `/readyz`, `GET /api/v1/status`, `ispconfig-rest doctor`, the `incompatible-ispconfig-schema` problem and the log location `/var/log/ispconfig-rest/`
+- [x] T039 Amend the constitution through `/speckit-constitution`: record the unauthenticated probe routes, and `/readyz` answering 503, as the documented exception to Principles IV and V (plan Complexity Tracking)
 - [ ] T040 Run the full suite (`php artisan test`, container) and the quickstart manual steps on a staging host; confirm no ISPConfig table or `sys_datalog` row is written by any new code path
 - [ ] T041 Record the Salt follow-ups in an issue (separate repository, no code here): create `/var/log/ispconfig-rest` for the run user, run `ispconfig-rest doctor` after any `dbispconfig` restore, and compare `.ispconfig-version` with `min_version`; multi-server stays a TODO
 
