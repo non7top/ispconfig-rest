@@ -54,7 +54,7 @@ Every prompt has a flag and `ISPC_REST_*` env var for unattended installs — se
 
 ```bash
 ispconfig-rest status                        # service state, version, DB connectivity
-ispconfig-rest update                        # pull latest, install deps, migrate, restart
+ispconfig-rest update                        # check the ISPConfig schema level, pull latest, install deps, migrate, restart
 ispconfig-rest key:create "my integration"   # mint an admin key
 ispconfig-rest key:create "acme" --client-id 42   # mint a client-scoped key
 ispconfig-rest firewall:allow 8090           # open a port in the ISPConfig firewall

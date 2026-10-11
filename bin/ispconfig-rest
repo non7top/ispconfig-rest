@@ -75,6 +75,34 @@ cmd_status() {
   fi
 }
 
+LOG_DIR="/var/log/ispconfig-rest"
+
+# Refuse to replace the code when the ISPConfig schema is below the level the
+# incoming version needs ($1 is its ISPCONFIG_COMPAT); the API never applies ISPConfig patches.
+check_ispconfig_schema() {
+  local min_db min_ver found
+  min_db="$(printf '%s\n' "$1" | sed -n 's/^min_dbversion=//p')"
+  min_ver="$(printf '%s\n' "$1" | sed -n 's/^min_version=//p')"
+  case "$min_db" in ''|*[!0-9]*) die "ISPCONFIG_COMPAT has no valid min_dbversion";; esac
+  found="$(run_as "$PHP_BIN" -r 'require "vendor/autoload.php"; $e=Dotenv\Dotenv::createArrayBacked(getcwd())->load(); $p=new PDO("mysql:host=$e[DB_HOST];port=$e[DB_PORT];dbname=$e[DB_DATABASE]",$e["DB_USERNAME"],$e["DB_PASSWORD"],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]); echo $p->query("SELECT MIN(dbversion) FROM server")->fetchColumn();' 2>/dev/null)" \
+    || die "Cannot read the ISPConfig schema level (server.dbversion); nothing was changed."
+  case "$found" in ''|*[!0-9]*) die "The ISPConfig schema level could not be determined; nothing was changed.";; esac
+  [ "$found" -ge "$min_db" ] \
+    || die "ISPConfig schema level $found is below the required $min_db (ISPConfig $min_ver). Run ISPConfig's updater first; nothing was changed."
+  ok "ISPConfig schema level $found (requires $min_db)"
+}
+
+# Logs live outside the install tree (under /usr). Installs from before this
+# was introduced have LOG_CHANNEL=stack and no LOG_PATH in .env.
+ensure_log_setup() {
+  local env="$INSTALL_DIR/.env"
+  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
+  [ -f "$env" ] || return 0
+  if grep -q '^LOG_CHANNEL=stack$' "$env"; then sed -i 's/^LOG_CHANNEL=stack$/LOG_CHANNEL=resilient/' "$env"; fi
+  grep -q '^LOG_PATH=' "$env" || printf 'LOG_PATH=%s/ispconfig-rest.log\n' "$LOG_DIR" >> "$env"
+  ok "Logs in $LOG_DIR"
+}
+
 cmd_update() {
   need_root
   info "Updating ISPConfig REST API in $INSTALL_DIR"
@@ -84,10 +112,12 @@ cmd_update() {
   # Run git as the repo owner (not root) — the tree is owned by $RUN_USER, and
   # git refuses to operate on a repo owned by a different user ("dubious
   # ownership"). run_as = sudo -u $RUN_USER, so ownership matches.
-  local before after
+  local before after compat
   before="$(run_as git rev-parse --short HEAD 2>/dev/null || echo '?')"
 
   run_as git fetch --depth 1 origin "${BRANCH:-main}"
+  # Checked before the tree is replaced, so a refused update leaves the running version untouched.
+  if compat="$(run_as git show "origin/${BRANCH:-main}:ISPCONFIG_COMPAT" 2>/dev/null)"; then check_ispconfig_schema "$compat"; fi
   run_as git checkout -f "${BRANCH:-main}"
   run_as git reset --hard "origin/${BRANCH:-main}"
   after="$(run_as git rev-parse --short HEAD 2>/dev/null || echo '?')"
@@ -96,6 +126,7 @@ cmd_update() {
 
   local composer="composer"; command -v composer >/dev/null 2>&1 || composer="$PHP_BIN $INSTALL_DIR/composer.phar"
   run_as env COMPOSER_HOME="$INSTALL_DIR/.composer" $composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+  ensure_log_setup
   run_as "$PHP_BIN" artisan migrate --force
   run_as "$PHP_BIN" artisan config:cache >/dev/null 2>&1 || true
   run_as "$PHP_BIN" artisan route:cache  >/dev/null 2>&1 || true
@@ -113,8 +144,8 @@ cmd_service() { # restart (start/stop don't apply — the web server + fpm are s
 }
 
 cmd_logs() {
-  # Prefer the app's own Laravel log; fall back to the Apache vhost error log.
-  local applog="$INSTALL_DIR/storage/logs/laravel.log"
+  # Prefer the app's own log; fall back to the Apache vhost error log.
+  local applog="$LOG_DIR/ispconfig-rest.log"
   local weblog="/var/log/apache2/${SERVICE_NAME}-error.log"
   local log="$applog"; [ -f "$applog" ] || log="$weblog"
   [ -f "$log" ] || die "No log file found ($applog or $weblog)."
