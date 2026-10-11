@@ -468,6 +468,10 @@ info "API timezone: $TIMEZONE ($TIMEZONE_MODE)"
 
 step "Configuring environment"
 ENV_FILE="$INSTALL_DIR/.env"
+# Logs live outside the install tree; the app rotates them itself.
+LOG_DIR="/var/log/ispconfig-rest"
+install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
+ok "Log directory $LOG_DIR"
 APP_KEY_LINE="$(run_as "$PHP_BIN" -r '
   $env = @file_get_contents(".env");
   if (is_string($env) && preg_match("/^APP_KEY=(base64:[A-Za-z0-9+\/=]{44})$/m", $env, $match)
@@ -487,7 +491,8 @@ APP_DEBUG=false
 APP_URL=$(env_escape "$APP_URL")
 APP_TIMEZONE=$(env_escape "$TIMEZONE")
 
-LOG_CHANNEL=stack
+LOG_CHANNEL=resilient
+LOG_PATH=$LOG_DIR/ispconfig-rest.log
 LOG_LEVEL=warning
 
 DB_CONNECTION=mysql
