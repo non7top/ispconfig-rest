@@ -134,4 +134,13 @@ class CompatibilityServiceTest extends TestCase
         DB::table('server')->update(['dbversion' => 104]);
         $this->assertTrue($this->report()->compatible(), 'an incompatible result is re-read at once');
     }
+
+    public function test_an_unwritable_cache_does_not_fail_the_check(): void
+    {
+        $this->level(104);
+        Cache::shouldReceive('get')->andReturn(null);
+        Cache::shouldReceive('put')->andThrow(new \RuntimeException('cache directory is not writable'));
+
+        $this->assertTrue($this->report()->compatible());
+    }
 }

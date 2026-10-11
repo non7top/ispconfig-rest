@@ -44,7 +44,11 @@ class CompatibilityService
         $report = $this->evaluate((int) $level, $this->monitor->ispconfigVersion());
 
         if ($report->compatible()) {
-            Cache::put(self::CACHE_KEY, ['dbversion' => $report->dbversion, 'version' => $report->version], (int) config('api.compat_cache_ttl'));
+            try {
+                Cache::put(self::CACHE_KEY, ['dbversion' => $report->dbversion, 'version' => $report->version], (int) config('api.compat_cache_ttl'));
+            } catch (Throwable) {
+                // The cache only saves a query; a broken one must not fail requests.
+            }
         }
 
         return $report;
