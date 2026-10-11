@@ -12,7 +12,7 @@ The OpenAPI 3 contract in [`api/`](api/) is the source of truth — the PHP impl
 
 - PHP ≥ 8.3
 - Composer
-- Network access to an ISPConfig 3.3 MySQL database (`dbispconfig`) — reverse-engineered against 3.3.0p1, validated live against 3.3.1p1
+- Network access to an ISPConfig 3.3 MySQL database (`dbispconfig`) — reverse-engineered against 3.3.0p1, validated live against 3.3.1p1. The supported schema level (`server.dbversion`) and release are declared in [`ISPCONFIG_COMPAT`](ISPCONFIG_COMPAT); the installer refuses a database below it, and while it is below, writes are refused (reads keep working). Run ISPConfig's updater to fix it.
 
 ## Install on an ISPConfig server (recommended)
 
@@ -58,6 +58,7 @@ ispconfig-rest update                        # pull latest, install deps, migrat
 ispconfig-rest key:create "my integration"   # mint an admin key
 ispconfig-rest key:create "acme" --client-id 42   # mint a client-scoped key
 ispconfig-rest firewall:allow 8090           # open a port in the ISPConfig firewall
+ispconfig-rest doctor                        # check the database, ISPConfig schema level, migrations and logs
 ispconfig-rest restart | logs -f | version | uninstall
 ```
 
@@ -103,7 +104,10 @@ Scoped keys are also bound by their client's **resource limits** (`client.limit_
 - **Lists**: `GET /api/v1/{module}/{resource}?limit=25&offset=0&sort=domain&order=asc` returns `{ "data": [...], "meta": { "total", "limit", "offset" } }`. Unknown query parameters are rejected with `400` — filters are never silently ignored.
 - **Errors**: RFC 9457 `application/problem+json` — `{ "type", "title", "status", "detail" }`, plus an `errors` map on validation failures (`422`).
 - **Problem types**: refusals an integration acts on carry a stable `type` URI instead of `about:blank` (spec 023, [docs/problems.md](docs/problems.md)): `…/docs/problems.md#account-locked`, `#limit-reached` and `#quota-exceeded` (403, with a `limit` member — `name`, `scope`, `max`, `used`, plus `unit` and `requested` for quotas), `#feature-not-allowed` (403, with `feature`, the client limit column) and `#validation-failed` (422), whose `error_types` map marks fields refused as `feature-not-allowed` or `server-not-assigned`. Status codes, titles and details are unchanged; compare the `type`, not the text.
+- **Incompatible ISPConfig schema**: a missing table or column, or a schema level below `ISPCONFIG_COMPAT`, is a `500` problem of type `…/docs/problems.md#incompatible-ispconfig-schema` naming only the table and column, or the found and required levels (never SQL). Writes are refused before any row is created.
 - **Status codes**: `200` read/update, `201` create, `204` delete, `400/401/404/409/422` as problem+json.
+- **Probes and status**: `GET /livez` and `GET /readyz` (unauthenticated, per-check states only, `readyz` is `503` when the database, the schema level or the migrations fail; `/up` is the framework's own check) and, for administrator keys, `GET /api/v1/status` with the levels behind it.
+- **Logs**: unhandled failures are logged to `/var/log/ispconfig-rest/` (rotated daily, 14 days), falling back to the PHP error log; a broken log never changes a response.
 - **Let's Encrypt outcome**: `GET /api/v1/sites/web-domains/{id}/ssl/status` reports `none`, `requested`, `issued` or `failed` for a website's free certificate. ISPConfig switches Let's Encrypt back off without a journal entry when issuance fails, so the state is derived from the enabling change, its processing status and the current flags. Failure reasons (`domain_not_reachable`, `issuance_failed`, `certificate_not_found`, `client_unavailable`) need the server log level set to Warning or Debug (System → Server Config → Server → Log level); otherwise the reason is `unknown`. Certificate validity is returned only when the API can read `<document_root>/ssl/<domain>-le.crt` (single-server installations).
 - **Async writes**: a successful write confirms the `sys_datalog` journal entry; ISPConfig's daemons apply it within their next cycle (typically ≤ 1 minute). Every write that journaled at least one entry returns an `X-Change-Set-Id` header; any key polls `GET /api/v1/changes/{id}` until the status is `applied`, `failed` or `stalled`, or lists its pending and failed changes with `GET /api/v1/changes?status=pending`. No-change updates, validation failures and writes to API-owned data (API keys) return no header. `/monitor/data-logs` stays the admin view of journal payloads.
 - **Booleans**: ISPConfig's `y/n` enum columns are exposed as JSON booleans and stored in the column's native case.
