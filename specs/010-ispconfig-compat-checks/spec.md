@@ -140,10 +140,10 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 
 ### Functional Requirements
 
-- **FR-001**: A query failure with SQLSTATE `42S22` or `42S02` MUST produce a 503 `application/problem+json` response of type `incompatible-ispconfig-schema` naming only the table and, for `42S22`, the column.
+- **FR-001**: A query failure with SQLSTATE `42S22` or `42S02` MUST produce a 503 `application/problem+json` response of type `incompatible-ispconfig-schema` naming only the table (when it can be determined) and, for `42S22`, the column.
 - **FR-002**: Response bodies MUST NOT contain SQL text, bound values, hostnames or credentials for any failure, regardless of `app.debug` state for these two SQLSTATEs.
 - **FR-003**: All other unhandled failures MUST keep the generic 500 problem, with the cause hidden unless `app.debug` is on.
-- **FR-004**: The required schema level MUST be declared in a single file, `ISPCONFIG_COMPAT`, at the repository root beside `VERSION`, as `key=value` lines `min_dbversion`, `min_version` and `tested_version`.
+- **FR-004**: The required schema level MUST be declared in a single file, `ISPCONFIG_COMPAT`, at the repository root beside `VERSION`, as `key=value` lines `min_dbversion`, `min_version` and `tested_version`, plus an optional `schema_tarball_sha256` pinning the ISPConfig release CI downloads.
 - **FR-005**: The application, the installer, the `doctor` command and CI MUST all read that file; no component may hard-code the minimum.
 - **FR-006**: A missing or malformed `ISPCONFIG_COMPAT` MUST fail each reader loudly with a message naming the file.
 - **FR-007**: The API MUST read the schema level from the `dbversion` of the installation's single `server` row and MAY read the ISPConfig version string from the `ispc_info` monitor row; compatibility MUST be decided by the schema level, with the version string informational.
