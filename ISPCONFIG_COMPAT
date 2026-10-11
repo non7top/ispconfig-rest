@@ -6,6 +6,6 @@ min_dbversion=101
 # ISPConfig release that level belongs to.
 min_version=3.3.1p1
 # Release whose schema CI checks the written columns against.
-tested_version=3.3.1p1
+tested_version=3.3.2p1
 # sha256 of ISPConfig-<tested_version>.tar.gz that CI downloads from ispconfig.org.
-schema_tarball_sha256=9525afb5ed886ba3c34eaf3288e9827bf1c540f26dfba695b53709072d966f0e
+schema_tarball_sha256=b3a2111e997df8e1472933788c2809f038498e97bc00fbd285e18a84a47d4a93
