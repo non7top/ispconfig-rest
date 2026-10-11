@@ -157,14 +157,14 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ### Tests for User Story 5 (REQUIRED) ⚠️
 
-- [ ] T033 [P] [US5] Unit test `tests/Unit/CheckCompatSchemaTest.php` with small fixture SQL under `tests/fixtures/ispconfig-schema/` (a base `ispconfig3.sql` and `incremental/upd_0100.sql`, `upd_0101.sql`): a column from patch 101 with `min_dbversion=100` fails naming column and patch; with `101` it passes; a written column in no schema fails; an unclassifiable statement is printed as a warning, not skipped silently
+- [x] T033 [P] [US5] Unit test `tests/Unit/CheckCompatSchemaTest.php` with small fixture SQL under `tests/fixtures/ispconfig-schema/` (a base `ispconfig3.sql` and `incremental/upd_0100.sql`, `upd_0101.sql`): a column from patch 101 with `min_dbversion=100` fails naming column and patch; with `101` it passes; a written column in no schema fails; an unclassifiable statement is printed as a warning, not skipped silently
 
 ### Implementation for User Story 5
 
-- [ ] T034 [US5] Add the collector to `tests/TestCase.php`: when `COMPAT_COLLECT=<path>` is set, register `DB::listen` in `setUp()`, extract `(table, column)` pairs from `insert` and `update` statements (ignore `api_*` and framework tables) and write the unique set as JSON at shutdown
-- [ ] T035 [US5] Implement `scripts/check-compat-schema.php`: read the collected JSON, parse `install/sql/ispconfig3.sql` (columns per table) and `install/sql/incremental/upd_NNNN.sql` (`ADD COLUMN`, `CREATE TABLE`) from a directory argument, compute each column's introducing patch, print the required level and fail if it exceeds `min_dbversion` or a column exists in no schema (research R9)
-- [ ] T036 [US5] Compute the sha256 of `ISPConfig-3.3.1p1.tar.gz` from ispconfig.org and add `schema_tarball_sha256` to `ISPCONFIG_COMPAT`; add the CI steps to `.github/workflows/tests.yml`: run the suite with `COMPAT_COLLECT=build/written-columns.json`, download the tarball, verify the sha256, extract `install/sql/`, run `scripts/check-compat-schema.php`
-- [ ] T037 [US5] Verify the negative case once on a throwaway branch (a write to a patch-101 column fails CI naming it) and record the result in the PR description
+- [x] T034 [US5] Add the collector to `tests/TestCase.php`: when `COMPAT_COLLECT=<path>` is set, register `DB::listen` in `setUp()`, extract `(table, column)` pairs from `insert` and `update` statements (ignore `api_*` and framework tables) and write the unique set as JSON at shutdown
+- [x] T035 [US5] Implement `scripts/check-compat-schema.php`: read the collected JSON, parse `install/sql/ispconfig3.sql` (columns per table) and `install/sql/incremental/upd_NNNN.sql` (`ADD COLUMN`, `CREATE TABLE`) from a directory argument, compute each column's introducing patch, print the required level and fail if it exceeds `min_dbversion` or a column exists in no schema (research R9)
+- [x] T036 [US5] Compute the sha256 of `ISPConfig-3.3.1p1.tar.gz` from ispconfig.org and add `schema_tarball_sha256` to `ISPCONFIG_COMPAT`; add the CI steps to `.github/workflows/tests.yml`: run the suite with `COMPAT_COLLECT=build/written-columns.json`, download the tarball, verify the sha256, extract `install/sql/`, run `scripts/check-compat-schema.php`
+- [x] T037 [US5] Verify the negative case once on a throwaway branch (a write to a patch-101 column fails CI naming it) and record the result in the PR description
 
 **Checkpoint**: the declared minimum cannot silently fall behind the code
 
