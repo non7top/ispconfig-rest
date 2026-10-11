@@ -35,3 +35,7 @@ directive-snippets:
 # Service resynchronization
 resync:
   $ref: './resync.yaml'
+
+# Status and compatibility
+status:
+  $ref: './status.yaml'
