@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Support\CompatReport;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use PDOException;
+use Throwable;
 
 /**
  * Compares the ISPConfig schema level (server.dbversion, the updater's own
@@ -33,7 +33,7 @@ class CompatibilityService
 
         try {
             $level = DB::table('server')->min('dbversion');
-        } catch (PDOException) {
+        } catch (Throwable) {
             return $this->build(CompatReport::UNREACHABLE);
         }
 

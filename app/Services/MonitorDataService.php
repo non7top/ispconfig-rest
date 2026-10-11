@@ -4,7 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use PDOException;
+use Throwable;
 
 /**
  * Assembles the contract's ServerStatus projection (spec 009; schema
@@ -141,7 +141,7 @@ class MonitorDataService
                 ->where('type', 'ispc_info')
                 ->orderByDesc('created')
                 ->value('data');
-        } catch (PDOException) {
+        } catch (Throwable) {
             return null;
         }
 
