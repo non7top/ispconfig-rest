@@ -54,6 +54,14 @@ Every prompt has a flag and `ISPC_REST_*` env var for unattended installs — se
 
 Each release tag (a date, such as `2026.10.11`) is built into a `.deb` with the dependencies included, so the host needs PHP 8.3 or newer and no git or composer. The package creates the `ispconfig-rest` system user, `/etc/ispconfig-rest`, `/var/log/ispconfig-rest` and `/var/cache/ispconfig-rest`, and nothing else: it writes no configuration and runs no migration. Build and check one locally with `scripts/build-deb.sh <version>` and `scripts/test-deb.sh <file>`.
 
+The release workflow signs the apt repository with [apt-cosign](https://github.com/non7top/apt-cosign) (a Sigstore bundle per file, bound to this repository's GitHub Actions identity) and publishes it on the `apt-repo` branch, with the `.deb` and a `SHA256SUMS` file also attached to the GitHub release. With `apt-cosign` installed on the host, the source is:
+
+```
+deb [trusted=yes] sigstore+https://raw.githubusercontent.com/non7top/ispconfig-rest/refs/heads/apt-repo/ ./
+```
+
+For a GitHub-hosted source `apt-cosign` needs no policy: it derives the owner and repository from the URL and accepts only that repository's workflows; pin the workflow with `Enforce::Repo { Pipeline "release.yml"; }` to narrow it (see its README).
+
 Then, as an administrator or a configuration-management state:
 
 1. Write `/etc/ispconfig-rest/.env` (owner `root`, group `ispconfig-rest`, mode `0640`) from [`packaging/deb/env.example`](packaging/deb/env.example), installed as `/usr/share/ispconfig-rest/env.example`, with an `APP_KEY` and the runtime database login.
