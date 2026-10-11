@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Exceptions\IncompatibleSchemaException;
 use App\Exceptions\ProblemAuthorizationException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -80,6 +81,17 @@ class Problem
             $detail = $e->getMessage() !== '' ? $e->getMessage() : 'You do not have permission to perform this action.';
 
             return self::response(403, 'Forbidden', $detail);
+        }
+
+        if ($e instanceof IncompatibleSchemaException) {
+            return self::response(500, 'Incompatible ISPConfig schema', $e->getMessage(), [
+                'type' => ProblemType::uri(ProblemType::INCOMPATIBLE_SCHEMA),
+            ] + array_filter([
+                'table' => $e->table,
+                'column' => $e->column,
+                'found_dbversion' => $e->foundDbversion,
+                'required_dbversion' => $e->requiredDbversion,
+            ], fn ($member) => $member !== null));
         }
 
         if ($e instanceof HttpExceptionInterface) {
