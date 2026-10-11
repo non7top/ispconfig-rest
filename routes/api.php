@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Route;
 | (constitution Principle IV): specific routes before general ones.
 */
 
-Route::middleware('api.key')->group(function () {
+// change.set adds X-Change-Set-Id to successful journaling writes (spec 015).
+Route::middleware(['api.key', 'change.set'])->group(function () {
     Route::get('/ping', fn () => response()->json([
         'data' => ['pong' => true],
     ]));
@@ -25,6 +26,7 @@ Route::middleware('api.key')->group(function () {
     | (sys_user.modules CSV — config.inc.php:109), and their tables carry no
     | row permissions. Non-admin keys get 403 before any query runs.
     */
+    require __DIR__.'/api/changes.php';
     require __DIR__.'/api/client.php';
     require __DIR__.'/api/dns.php';
     require __DIR__.'/api/mail.php';
