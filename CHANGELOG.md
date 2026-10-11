@@ -5,6 +5,13 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+### Changed
+
+- The `version` in the `GET /` response is now the release version from the `VERSION`
+  file (for example `1.0.6`), not the fixed `1.0` that `API_VERSION` in `.env` set. The
+  `API_VERSION` setting is no longer read and is dropped from `.env.example` and the
+  installer.
+
 ## [1.0.6] - 2026-10-10
 
 This release adds the `dns-catalog` server tool: a catalog zone on each ISPConfig DNS
