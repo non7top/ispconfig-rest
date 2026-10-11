@@ -50,6 +50,16 @@ Every prompt has a flag and `ISPC_REST_*` env var for unattended installs — se
 [nginx vhost](deploy/nginx-vhost.conf.example),
 [php-fpm pool](deploy/php-fpm-pool.conf.example).
 
+### Install from the package
+
+Each release tag (a date, such as `2026.10.11`) is built into a `.deb` with the dependencies included, so the host needs PHP 8.3 or newer and no git or composer. The package creates the `ispconfig-rest` system user, `/etc/ispconfig-rest`, `/var/log/ispconfig-rest` and `/var/cache/ispconfig-rest`, and nothing else: it writes no configuration and runs no migration. Build and check one locally with `scripts/build-deb.sh <version>` and `scripts/test-deb.sh <file>`.
+
+Then, as an administrator or a configuration-management state:
+
+1. Write `/etc/ispconfig-rest/.env` (owner `root`, group `ispconfig-rest`, mode `0640`) from [`packaging/deb/env.example`](packaging/deb/env.example), installed as `/usr/share/ispconfig-rest/env.example`, with an `APP_KEY` and the runtime database login.
+2. Run the php-fpm pool and the web server as you do for any install (see [`deploy/`](deploy/)); the pool runs as `ispconfig-rest`.
+3. `ispconfig-rest migrate` (see below), then `ispconfig-rest doctor`. Updates are `apt-get install --only-upgrade ispconfig-rest`; `ispconfig-rest update` refuses on a package install.
+
 ### Managing the installation
 
 ```bash
