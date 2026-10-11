@@ -188,6 +188,10 @@ hosting extension 1.0.2. The HTTP API remains under `/api/v1`.
 - A fresh install directory needs an existing root-owned parent that other users cannot write. Privileged
   installer migrations include only extensions recorded in the root-owned manager registry.
 
+### Fixed
+
+- The installer preflight also checks for the PHP `phar` extension, which Composer needs.
+
 ## [1.4.0] - 2026-10-17
 
 Domains without hosting can be removed with their services. No migrations. Requires PHP 8.3 or newer and ISPConfig
