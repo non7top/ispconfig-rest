@@ -5,7 +5,7 @@
 
 ## Summary
 
-Turn the s24 failure (a restored, older `dbispconfig` schema produced a bare, unlogged 500 and orphan rows) into a visible, refused and checkable condition. The plan: map a missing column or table to a typed 503 problem; declare the minimum ISPConfig schema level in one file, `ISPCONFIG_COMPAT`, read by the app, the installer, a `doctor` command and CI; refuse writes (not reads) below it before any row is written; add Kubernetes-style `/livez` and `/readyz` probes and an administrator-only `/api/v1/status`; log failures outside `/usr` with a file-then-PHP-FPM-log fallback that can never break the response; and add a CI step that derives, from the real ISPConfig schema, the level the code actually needs. Decisions and rejected alternatives are in [research.md](research.md).
+Turn the s24 failure (a restored, older `dbispconfig` schema produced a bare, unlogged 500 and orphan rows) into a visible, refused and checkable condition. The plan: map a missing column or table to a typed 500 problem; declare the minimum ISPConfig schema level in one file, `ISPCONFIG_COMPAT`, read by the app, the installer, a `doctor` command and CI; refuse writes (not reads) below it before any row is written; add Kubernetes-style `/livez` and `/readyz` probes and an administrator-only `/api/v1/status`; log failures outside `/usr` with a file-then-PHP-FPM-log fallback that can never break the response; and add a CI step that derives, from the real ISPConfig schema, the level the code actually needs. Decisions and rejected alternatives are in [research.md](research.md).
 
 ## Technical Context
 
@@ -21,13 +21,13 @@ Turn the s24 failure (a restored, older `dbispconfig` schema produced a bare, un
 
 ## Constitution Check
 
-*GATE: passes with two documented exceptions (Complexity Tracking). Re-checked after Phase 1 design: unchanged.*
+*GATE: passes with one documented exception (Complexity Tracking). Re-checked after Phase 1 design: unchanged.*
 
 - [x] **Spec-first (I)**: contracts are authored first in [`contracts/api-probes-status.yaml`](contracts/api-probes-status.yaml) and split into `api/modules/system/status.yaml`, `api/openapi.yaml` and `api/components/` as the first implementation step; no URL or body shape exists only in PHP
 - [x] **Datalog-only writes (II)**: the feature writes nothing to ISPConfig tables; it reads `server` and `monitor_data`. The API never applies schema patches
 - [x] **Legacy parity (III)**: the schema level and version comparison mirror ISPConfig's own `update.lib.php` (`dbversion` plus `upd_NNNN`) and `version_compare`; recorded in the spec's Parity section
 - [~] **Route discipline (IV)**: `/api/v1/status` goes in the authenticated `scope.admin` group of `routes/api/system.php`; the unauthenticated probes are an exception (Complexity Tracking)
-- [~] **HTTP contract (V)**: errors are RFC 9457 problem+json and the probes' non-problem bodies are operational JSON; 503 is not in the constitution's status list (Complexity Tracking)
+- [x] **HTTP contract (V)**: errors are RFC 9457 problem+json with the existing 500; only `/readyz` answers 503, with an operational JSON body (part of the probe exception below)
 - [x] **No schema changes**: no migration against ISPConfig tables; no new API table
 
 ## Project Structure
@@ -108,4 +108,3 @@ Slice 1 builds on the problem-type catalogue (spec 023, PR #16); PR #10 (`config
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | `/livez` and `/readyz` are unauthenticated and outside the versioned `api/v1` group (Principle IV) | Orchestrator and load-balancer probes cannot present an API key and must not depend on the database for liveness | Putting them in `api/v1` behind `api.key` would make a probe depend on the key store being healthy and would 401 every probe. They expose per-check states only, never versions or levels |
-| HTTP 503 is not in Principle V's status list | A missing schema or incompatible ISPConfig is a dependency being unavailable for this request, not a client error (4xx) nor a server bug (500); orchestrators key off 503 | 500 is what failed on s24 and is what makes the failure undiagnosable; 409/422 would blame the caller. A one-line constitution amendment adding 503 (dependency or compatibility unavailable) goes with the implementation |

@@ -48,7 +48,7 @@ Readiness is `ok` iff no check is `failed`. `degraded` (logging only) and `unkno
 
 ## Problem members
 
-`incompatible-ispconfig-schema` problem (503) adds members, never SQL:
+`incompatible-ispconfig-schema` problem (500) adds members, never SQL:
 
 | Case | Members |
 |------|---------|

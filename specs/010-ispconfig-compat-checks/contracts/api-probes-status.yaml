@@ -77,7 +77,7 @@ components:
                 description: ProblemType::uri('incompatible-ispconfig-schema'), the catalogue URL ending in #incompatible-ispconfig-schema
                 pattern: '#incompatible-ispconfig-schema$'
               title: { type: string }
-              status: { type: integer, enum: [503] }
+              status: { type: integer, enum: [500] }
               detail: { type: string }
               table: { type: string, description: Present when determinable }
               column: { type: string, description: Present for a missing column }

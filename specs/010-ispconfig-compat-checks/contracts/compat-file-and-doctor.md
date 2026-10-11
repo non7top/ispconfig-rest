@@ -34,7 +34,7 @@ Exit code 0 when no check is `failed`; 1 otherwise. `logging: degraded` alone ex
 
 A `ProblemType` catalogue entry (spec 023); its `type` URI is `ProblemType::uri('incompatible-ispconfig-schema')`.
 
-HTTP 503, `application/problem+json`. Members per `data-model.md`. `detail` examples:
+HTTP 500, `application/problem+json`. Members per `data-model.md`. `detail` examples:
 
 - `The ISPConfig database schema is older than this API expects: table web_domain is missing column disable_symlinknotowner. Run ISPConfig's updater.`
 - `ISPConfig schema level 98 is below the required 100. Run ISPConfig's updater.`

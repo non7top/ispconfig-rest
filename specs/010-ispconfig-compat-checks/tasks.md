@@ -50,9 +50,9 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 - [ ] T003 Implement `App\Support\IspconfigCompat::load()` in `app/Support/IspconfigCompat.php`: parse `ISPCONFIG_COMPAT` (`key=value`, `#` comments, blank lines), require `min_dbversion` (int ≥ 1), `min_version`, `tested_version`, accept optional `schema_tarball_sha256` (64 hex), reject unknown keys, and throw an error that names the file for a missing file, a missing key or a malformed value (FR-004–FR-006)
 - [ ] T004 [P] Unit test `tests/Unit/IspconfigCompatTest.php`: valid file, comments and blank lines, missing file, missing key, non-integer level, bad sha256, unknown key (each error names `ISPCONFIG_COMPAT`)
 - [ ] T005 Add the `compat` block to `config/api.php`: `compat` => `IspconfigCompat::load()` result, `compat_cache_ttl` => `env('API_COMPAT_CACHE_TTL', 60)`; keep the existing `VERSION` read untouched
-- [ ] T006 Register the problem type: add `INCOMPATIBLE_SCHEMA = 'incompatible-ispconfig-schema'` to `app/Support/ProblemType.php` (constant and `NAMES`) and an `incompatible-ispconfig-schema` section (status 503, members `table`, `column`, `found_dbversion`, `required_dbversion`) to `docs/problems.md`; keep the catalogue-versus-documentation consistency test green
-- [ ] T007 Create `app/Exceptions/IncompatibleSchemaException.php` carrying either table/column or found/required levels (or "level unknown"), with a message that never contains SQL; render it in `app/Support/Problem.php` as a 503 problem with `type` = `ProblemType::uri(ProblemType::INCOMPATIBLE_SCHEMA)` and the members above
-- [ ] T008 [P] Author `api/components/responses/IncompatibleSchema.yaml` from `contracts/api-probes-status.yaml` and register it in the responses index; reference it from the 503 responses added later
+- [ ] T006 Register the problem type: add `INCOMPATIBLE_SCHEMA = 'incompatible-ispconfig-schema'` to `app/Support/ProblemType.php` (constant and `NAMES`) and an `incompatible-ispconfig-schema` section (status 500, members `table`, `column`, `found_dbversion`, `required_dbversion`) to `docs/problems.md`; keep the catalogue-versus-documentation consistency test green
+- [ ] T007 Create `app/Exceptions/IncompatibleSchemaException.php` carrying either table/column or found/required levels (or "level unknown"), with a message that never contains SQL; render it in `app/Support/Problem.php` as a 500 problem with `type` = `ProblemType::uri(ProblemType::INCOMPATIBLE_SCHEMA)` and the members above
+- [ ] T008 [P] Author `api/components/responses/IncompatibleSchema.yaml` from `contracts/api-probes-status.yaml` and register it in the responses index; reference it from the 500 responses added later
 
 **Checkpoint**: loader, config, problem type and exception exist; stories can start
 
@@ -60,13 +60,13 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ## Phase 3: User Story 1 - A schema mismatch is reported, not hidden (Priority: P1) 🎯 MVP
 
-**Goal**: a missing column or table becomes an actionable 503 problem instead of a bare 500.
+**Goal**: a missing column or table becomes an actionable, typed 500 problem instead of a bare one.
 
 **Independent Test**: build a `QueryException` around a `PDOException` with `errorInfo` `['42S22', 1054, "Unknown column 'disable_symlinknotowner' in 'INSERT INTO'"]` raised from a `web_domain` insert and assert the response (SQLite cannot raise `42S22`, so this is synthetic).
 
 ### Tests for User Story 1 (REQUIRED) ⚠️
 
-- [ ] T009 [P] [US1] Feature test `tests/Feature/CompatMissingColumnTest.php`: `42S22` with an `insert into "web_domain"` statement returns 503, `application/problem+json`, `type` ending `#incompatible-ispconfig-schema`, `table` = `web_domain`, `column` = `disable_symlinknotowner`; `42S02` returns 503 naming the table; a qualified column (`web_domain.x`) names table and column; an unparseable statement names the column only; the body contains no SQL text, binding, host or credential (assert on the whole JSON string); any other SQLSTATE (deadlock `40001`, integrity `23000`) stays the generic 500 with `detail` hidden unless `app.debug`
+- [ ] T009 [P] [US1] Feature test `tests/Feature/CompatMissingColumnTest.php`: `42S22` with an `insert into "web_domain"` statement returns 500, `application/problem+json`, `type` ending `#incompatible-ispconfig-schema`, `table` = `web_domain`, `column` = `disable_symlinknotowner`; `42S02` returns 500 naming the table; a qualified column (`web_domain.x`) names table and column; an unparseable statement names the column only; the body contains no SQL text, binding, host or credential (assert on the whole JSON string); any other SQLSTATE (deadlock `40001`, integrity `23000`) stays the generic untyped 500 with `detail` hidden unless `app.debug`
 - [ ] T010 [P] [US1] In the same test class assert the full exception, including its SQL, is still reported to the log (`Log::spy()` or a log handler assertion) while the response stays clean (US1 scenario 4)
 
 ### Implementation for User Story 1
@@ -82,12 +82,12 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 **Goal**: below the minimum schema level, every write is refused before any row exists; reads keep working; the installer refuses to proceed.
 
-**Independent Test**: set the test database's `server.dbversion` below `min_dbversion`; `POST /api/v1/clients` returns 503 and creates no `client` and no `sys_datalog` row; `GET /api/v1/clients` returns 200.
+**Independent Test**: set the test database's `server.dbversion` below `min_dbversion`; `POST /api/v1/clients` returns 500 and creates no `client` and no `sys_datalog` row; `GET /api/v1/clients` returns 200.
 
 ### Tests for User Story 2 (REQUIRED) ⚠️
 
 - [ ] T013 [P] [US2] Unit/feature test `tests/Feature/CompatibilityServiceTest.php`: level above, equal and below the minimum; no `server` row and null `dbversion` → `unknown`; database error → `unreachable`; `MIN(dbversion)` over several rows; the `ispc_info` row parsed (version, absent row → null); `version_compare` with the `3.3.1p1` suffix; only a compatible result is cached and an incompatible one is re-read on the next call (FR-010)
-- [ ] T014 [P] [US2] Feature test `tests/Feature/CompatRefuseWritesTest.php`: below-minimum POST/PUT/DELETE on one endpoint per module (clients, dns, mail, sites) returns 503 naming both levels with `found_dbversion` and `required_dbversion`, and writes no row to the ISPConfig table or `sys_datalog`; GET still 200; no key still 401 (not 503) and non-admin scope unchanged; level undeterminable refuses writes with the "could not be determined" detail; raising the level makes writes work again without a restart
+- [ ] T014 [P] [US2] Feature test `tests/Feature/CompatRefuseWritesTest.php`: below-minimum POST/PUT/DELETE on one endpoint per module (clients, dns, mail, sites) returns 500 naming both levels with `found_dbversion` and `required_dbversion`, and writes no row to the ISPConfig table or `sys_datalog`; GET still 200; no key still 401 (not 500) and non-admin scope unchanged; level undeterminable refuses writes with the "could not be determined" detail; raising the level makes writes work again without a restart
 
 ### Implementation for User Story 2
 
@@ -173,7 +173,7 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 ## Phase 8: Polish & Cross-Cutting Concerns
 
 - [ ] T038 [P] Update `README.md`: the Requirements line points at `ISPCONFIG_COMPAT` instead of repeating versions; document `/livez`, `/readyz`, `GET /api/v1/status`, `ispconfig-rest doctor`, the `incompatible-ispconfig-schema` problem and the log location `/var/log/ispconfig-rest/`
-- [ ] T039 Amend the constitution through `/speckit-constitution`: add 503 (dependency or compatibility unavailable) to Principle V's status list and record the unauthenticated probe routes as the documented exception to Principle IV (plan Complexity Tracking)
+- [ ] T039 Amend the constitution through `/speckit-constitution`: record the unauthenticated probe routes, and `/readyz` answering 503, as the documented exception to Principles IV and V (plan Complexity Tracking)
 - [ ] T040 Run the full suite (`php artisan test`, container) and the quickstart manual steps on a staging host; confirm no ISPConfig table or `sys_datalog` row is written by any new code path
 - [ ] T041 Record the Salt follow-ups in an issue (separate repository, no code here): create `/var/log/ispconfig-rest` for the run user, run `ispconfig-rest doctor` after any `dbispconfig` restore, and compare `.ispconfig-version` with `min_version`; multi-server stays a TODO
 
@@ -220,7 +220,7 @@ Foundational (T001–T008) ships with slice 1.
 ### MVP First (User Story 1 only)
 
 1. Phase 1 and Phase 2
-2. Phase 3 (US1): the actionable 503 for a missing column or table
+2. Phase 3 (US1): the actionable typed 500 for a missing column or table
 3. **STOP and VALIDATE**: the quickstart's missing-column check, then ship slice 1 (with US4)
 
 ### Incremental Delivery
