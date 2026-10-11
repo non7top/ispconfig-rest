@@ -2,8 +2,10 @@
 # Read by the application, install.sh, `ispconfig-rest doctor` and CI.
 
 # Lowest server.dbversion (the ISPConfig updater's schema level) the code supports.
-min_dbversion=100
+min_dbversion=101
 # ISPConfig release that level belongs to.
 min_version=3.3.1p1
 # Release whose schema CI checks the written columns against.
 tested_version=3.3.1p1
+# sha256 of ISPConfig-<tested_version>.tar.gz that CI downloads from ispconfig.org.
+schema_tarball_sha256=9525afb5ed886ba3c34eaf3288e9827bf1c540f26dfba695b53709072d966f0e
