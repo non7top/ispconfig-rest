@@ -379,10 +379,28 @@ else ok "Using existing user $RUN_USER"; fi
 # ---------------------------------------------------------------------------
 # Fetch code + dependencies
 # ---------------------------------------------------------------------------
+# Refuse an ISPConfig database below the schema level the code supports
+# (ISPCONFIG_COMPAT, passed in as $1): the API never applies ISPConfig patches.
+check_ispconfig_schema() {
+  local min_db min_ver found
+  min_db="$(printf '%s\n' "$1" | sed -n 's/^min_dbversion=//p')"
+  min_ver="$(printf '%s\n' "$1" | sed -n 's/^min_version=//p')"
+  case "$min_db" in ''|*[!0-9]*) die "ISPCONFIG_COMPAT has no valid min_dbversion";; esac
+  found="$(ISPC_DSN="mysql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME" ISPC_USER="$DB_USER" ISPC_PASS="$DB_PASS" \
+    "$PHP_BIN" -r '$p=new PDO(getenv("ISPC_DSN"),getenv("ISPC_USER"),getenv("ISPC_PASS"),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]); echo $p->query("SELECT MIN(dbversion) FROM server")->fetchColumn();' 2>/dev/null)" \
+    || die "Cannot read the ISPConfig schema level (server.dbversion) from $DB_NAME"
+  case "$found" in ''|*[!0-9]*) die "The ISPConfig schema level in $DB_NAME could not be determined";; esac
+  [ "$found" -ge "$min_db" ] \
+    || die "ISPConfig schema level $found is below the required $min_db (ISPConfig $min_ver). Run ISPConfig's updater first."
+  ok "ISPConfig schema level $found (requires $min_db)"
+}
 step "Fetching application code"
 [[ "$INSTALL_DIR" = /* && "$INSTALL_DIR" != / && "$INSTALL_DIR" != */../* && "$INSTALL_DIR" != */.. ]] \
   || die "Install directory must be an absolute path without '..'."
 prepare_privileged_source
+# Checked before the runtime tree is touched, so a refused update leaves the running version untouched.
+# Releases without ISPCONFIG_COMPAT predate the check.
+if [ -f "$PRIVILEGED_STAGE/app/ISPCONFIG_COMPAT" ]; then check_ispconfig_schema "$(cat "$PRIVILEGED_STAGE/app/ISPCONFIG_COMPAT")"; fi
 # Existing code and Git hooks may be controlled by the web user. Every
 # operation on that checkout therefore runs with that user's permissions.
 [ ! -L "$INSTALL_DIR" ] || die "Install directory must not be a symlink."
