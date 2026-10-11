@@ -74,7 +74,8 @@ components:
             properties:
               type:
                 type: string
-                enum: ['urn:ispconfig-rest:problem:incompatible-ispconfig-schema']
+                description: ProblemType::uri('incompatible-ispconfig-schema'), the catalogue URL ending in #incompatible-ispconfig-schema
+                pattern: '#incompatible-ispconfig-schema$'
               title: { type: string }
               status: { type: integer, enum: [503] }
               detail: { type: string }

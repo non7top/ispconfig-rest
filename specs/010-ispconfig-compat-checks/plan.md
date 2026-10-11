@@ -60,6 +60,7 @@ api/
 app/
 ├── Support/IspconfigCompat.php           # new: parse and validate ISPCONFIG_COMPAT
 ├── Support/Problem.php                   # QueryException branch; IncompatibleSchema helper
+├── Support/ProblemType.php               # new constant INCOMPATIBLE_SCHEMA (catalogue from spec 023)
 ├── Support/Logging/ResilientLogger.php   # new: Monolog FallbackGroupHandler, never throws
 ├── Services/CompatibilityService.php     # new: schema level, version string, cache, CompatReport
 ├── Services/HealthCheckService.php       # new: database/schema/migrations/logging CheckResults
@@ -70,6 +71,7 @@ app/
 └── Console/Commands/Doctor.php           # new: ispconfig:doctor
 
 bootstrap/app.php                         # alias + append middleware; then: ops routes
+docs/problems.md                          # incompatible-ispconfig-schema entry
 config/api.php                            # compat block (PHP loader result, cache ttl)
 config/logging.php                        # resilient channel, LOG_PATH
 .env.example                              # LOG_PATH, API_COMPAT_CACHE_TTL
@@ -99,7 +101,7 @@ Done; see [research.md](research.md) R1–R2: `install/lib/update.lib.php` (`dbv
 3. **Probes, status, doctor** (US3): `HealthCheckService`, routes, controller, command.
 4. **CI schema check** (US5): collector, checker script, workflow step.
 
-Slices 2–4 depend on PR #10 (`config/api.php` reading `VERSION`).
+Slice 1 builds on the problem-type catalogue (spec 023, PR #16); PR #10 (`config/api.php` reading `VERSION`) is already merged.
 
 ## Complexity Tracking
 

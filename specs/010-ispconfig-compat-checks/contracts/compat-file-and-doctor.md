@@ -30,7 +30,9 @@ logging     degraded /var/log/ispconfig-rest is not writable
 
 Exit code 0 when no check is `failed`; 1 otherwise. `logging: degraded` alone exits 0 (it matches readiness) but is printed. `doctor` additionally attempts a write probe in the log directory, which readiness does not.
 
-## Problem type `urn:ispconfig-rest:problem:incompatible-ispconfig-schema`
+## Problem type `incompatible-ispconfig-schema`
+
+A `ProblemType` catalogue entry (spec 023); its `type` URI is `ProblemType::uri('incompatible-ispconfig-schema')`.
 
 HTTP 503, `application/problem+json`. Members per `data-model.md`. `detail` examples:
 

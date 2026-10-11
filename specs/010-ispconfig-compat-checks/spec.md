@@ -126,7 +126,7 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 | any write | `/api/v1/*` | Refused while the schema is below the minimum | existing | 503 problem |
 
 - **Existing routes**: `GET /` (name, version, documentation link) stays unauthenticated and minimal and gains no version or schema data. The framework's `/up` health route stays as it is; `/livez` is its Kubernetes-style alias. `/api/v1/monitor/servers/status` is unrelated: it reports ISPConfig servers, not the API.
-- **Problem type**: `incompatible-ispconfig-schema`, status 503, with members naming the table and column (reporting) or the found and required levels (refusal). Core has no problem-type catalogue yet, so this feature introduces the type URI convention with this first type.
+- **Problem type**: `incompatible-ispconfig-schema`, status 503, registered in the problem-type catalogue (`ProblemType`, `docs/problems.md`, spec 023) as its first compatibility entry, with members naming the table and column (reporting) or the found and required levels (refusal).
 
 ## ISPConfig Parity & Datalog Impact *(mandatory)*
 

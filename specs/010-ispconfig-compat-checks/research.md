@@ -26,7 +26,7 @@ All unknowns from the Technical Context are resolved below. Facts marked *verifi
 - **Decision**: a `QueryException` branch in `Problem::fromThrowable`. SQLSTATE from `$e->errorInfo[0]` (`42S22` unknown column, `42S02` unknown table). Column from the MySQL message (`Unknown column '<col>'`, which may be qualified `tbl.col`); table from the qualified column, else from the first table identifier after `insert into` / `update` / `from` in the *server-side* SQL. The SQL is parsed only to extract that identifier and is never copied into the response. When the table cannot be determined, the problem names the column only.
 - **Rationale**: *verified* from the s24 log that the message is `Unknown column 'disable_symlinknotowner' in 'INSERT INTO'` and does not name the table; the table comes from the statement.
 - **Testing**: SQLite cannot raise `42S22`, so tests build a `QueryException` around a `PDOException` whose `errorInfo` is `['42S22', 1054, ...]` and assert the response, the absence of SQL text, and that the full exception is still reported to the log.
-- **Type URI**: `urn:ispconfig-rest:problem:incompatible-ispconfig-schema`. RFC 9457 allows any URI reference; a URN needs no resolvable page and does not collide with a future upstream catalogue. Reversible by changing one constant.
+- **Type**: a new `ProblemType::INCOMPATIBLE_SCHEMA = 'incompatible-ispconfig-schema'` entry in the problem-type catalogue (spec 023, pulled into `core` in PR #16), documented in `docs/problems.md`, with its `type` URI built by `ProblemType::uri()`. The catalogue's `BASE_URI` points at upstream's `docs/problems.md`, which has no such anchor; keeping the constant as upstream has it follows the rule of deviating as little as possible, and repointing it at this fork's docs is a decision for the implementation PR.
 
 ## R5 — Logging outside `/usr`, and when logging is broken
 
@@ -67,4 +67,4 @@ All unknowns from the Technical Context are resolved below. Facts marked *verifi
 
 ## R11 — Sequencing with open PRs
 
-- Implementation builds on PR #10 (`config/api.php` reads `VERSION`). Branch from `core` after #10 merges, or rebase onto it.
+- PR #10 (`config/api.php` reads `VERSION`) is merged, and the problem-type catalogue (spec 023, PR #16) is the base the reporting slice builds on; rebase the implementation onto `core` once #16 is merged.
