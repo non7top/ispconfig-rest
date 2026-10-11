@@ -1,0 +1,74 @@
+name: release
+
+# A pushed tag (a date such as 2026.10.11) builds the .deb, checks it in clean
+# containers, signs the apt repository with apt-cosign and publishes it to the
+# apt-repo branch plus a GitHub release. workflow_dispatch builds and checks
+# only, using the VERSION file.
+on:
+  push:
+    tags: ['[0-9]*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then version="$GITHUB_REF_NAME"; else version="$(tr -d '[:space:]' < VERSION)"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # scripts/build-deb.sh also refuses a version that differs from VERSION, with the same message.
+      - name: Build the package
+        run: scripts/build-deb.sh "${{ steps.version.outputs.version }}" dist
+
+      - name: Check the package on PHP 8.3, 8.4 and 8.5
+        run: |
+          for image in php:8.3-cli php:8.4-cli php:8.5-cli; do
+            scripts/test-deb.sh dist/ispconfig-rest_${{ steps.version.outputs.version }}_all.deb "$image"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: deb
+          path: dist
+
+      - name: Fetch and verify apt-cosign-sign
+        id: sign
+        uses: non7top/apt-cosign/.github/actions/fetch-apt-cosign-sign@1b1b1fb5c04cd24e65b4919043a4d2a7d113a1ee # v0.8.0
+        with:
+          version: '0.8.0'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stage, sign and publish the apt repository
+        uses: non7top/apt-cosign/.github/actions/publish-apt-repo@1b1b1fb5c04cd24e65b4919043a4d2a7d113a1ee # v0.8.0
+        with:
+          sign-bin: ${{ steps.sign.outputs.bin-path }}
+          origin: ispconfig-rest
+          description: ispconfig-rest repository (sigstore-verified, no GPG signature)
+          commit-message: 'apt-repo: ${{ github.ref_name }}'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          (cd dist && sha256sum ./*.deb > SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" dist/*.deb dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
