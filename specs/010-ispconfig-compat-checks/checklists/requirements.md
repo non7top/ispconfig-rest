@@ -31,5 +31,5 @@
 
 ## Notes
 
-- One assumption is open for planning, not for the spec: which `server` row is authoritative for `dbversion` in a multi-server installation. It is recorded under Assumptions and Edge Cases and is confirmed against ISPConfig's `update.lib.php` before the plan fixes it.
+- Multi-server installations are out of scope; the spec carries a TODO to rework the schema-level check for multi-server management, because there is no agreed answer yet for which `server` row is authoritative.
 - The probe paths follow the Kubernetes `livez` / `readyz` convention; `/up` stays for compatibility.

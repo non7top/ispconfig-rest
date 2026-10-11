@@ -102,7 +102,7 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 
 ### Edge Cases
 
-- **Multi-server installations.** Each `server` row carries its own `dbversion`. The check reads the master server's row (the server that hosts `dbispconfig`). Which row is authoritative when several servers update the shared schema is confirmed against ISPConfig's `update.lib.php` during planning (see Assumptions).
+- **Multi-server installations are out of scope.** Each `server` row carries its own `dbversion`, and which row is authoritative when several servers update the shared schema is undecided. This feature supports single-server installations only. TODO: rework the schema-level check for multi-server management (see Assumptions).
 - **Schema level above anything known.** A level higher than the latest patch the API was built against is compatible; the API only requires a minimum.
 - **No `ispc_info` monitor row yet** (fresh install, monitor cron has not run). The ISPConfig version is reported as unknown and compatibility is decided from the schema level alone.
 - **Version string with a patch suffix** (`3.3.1p1`). Compared with PHP `version_compare`, which ISPConfig itself uses, so `3.3.1p1` is above `3.3.1`.
@@ -146,7 +146,7 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 - **FR-004**: The required schema level MUST be declared in a single file, `ISPCONFIG_COMPAT`, at the repository root beside `VERSION`, as `key=value` lines `min_dbversion`, `min_version` and `tested_version`.
 - **FR-005**: The application, the installer, the `doctor` command and CI MUST all read that file; no component may hard-code the minimum.
 - **FR-006**: A missing or malformed `ISPCONFIG_COMPAT` MUST fail each reader loudly with a message naming the file.
-- **FR-007**: The API MUST read the schema level from the master server's `server.dbversion` and MAY read the ISPConfig version string from the `ispc_info` monitor row; compatibility MUST be decided by the schema level, with the version string informational.
+- **FR-007**: The API MUST read the schema level from the `dbversion` of the installation's single `server` row and MAY read the ISPConfig version string from the `ispc_info` monitor row; compatibility MUST be decided by the schema level, with the version string informational.
 - **FR-008**: While the schema level is below `min_dbversion`, every write request under `/api/v1` MUST be refused with a 503 problem of type `incompatible-ispconfig-schema` naming the found and required levels, before any row is written; read requests MUST continue to be served.
 - **FR-009**: When the level cannot be determined, writes MUST be refused (not assumed compatible) with a problem that says so.
 - **FR-010**: The result of the schema check MUST be cached for a short, configurable time and MUST be re-read when the cached result is a failure.
@@ -166,7 +166,7 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 ### Key Entities *(include if feature involves data)*
 
 - **Compatibility declaration**: the file `ISPCONFIG_COMPAT` (`min_dbversion`, `min_version`, `tested_version`); not stored in the database.
-- **Schema level**: the integer `dbversion` of the master `server` row — table `server`, read-only.
+- **Schema level**: the integer `dbversion` of the installation's single `server` row — table `server`, read-only.
 - **ISPConfig version record**: the `ispc_info` row in `monitor_data` (`data.version`) — read-only, informational.
 - **Status report**: the response of `GET /api/v1/status` and the output of `doctor`; derived, not stored.
 
@@ -184,7 +184,7 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 
 ## Assumptions
 
-- The master server is the one whose `server` row hosts `dbispconfig`; the multi-server rule for `dbversion` (which row is authoritative when several servers run ISPConfig's updater against the shared schema) is confirmed against `update.lib.php` in planning, and this spec's single-row reading is revised if that shows otherwise.
+- The installation has a single server, so the schema level is the `dbversion` of that one `server` row. TODO: rework for multi-server management. The open question is which row is authoritative when several servers run ISPConfig's updater against the shared schema; it has no agreed answer yet, and a multi-server installation is not a supported target of this feature until it does.
 - The minimum for this fork starts at the schema level of ISPConfig 3.3.1p1's patch needed by the current code (100, from `upd_0100`) and is raised only when code needs it; `tested_version` is `3.3.1p1`.
 - `/livez` and `/readyz` are the Kubernetes naming convention; `/up` (framework default) remains for compatibility and is treated as an alias of liveness.
 - The application user already created by the installer owns the log directory; the Salt state that creates the user and directories is updated separately.
