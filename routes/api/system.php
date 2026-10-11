@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\DirectiveSnippetController;
 use App\Http\Controllers\Api\V1\DnsCaController;
 use App\Http\Controllers\Api\V1\ResyncController;
+use App\Http\Controllers\Api\V1\StatusController;
 use App\Http\Controllers\Api\V1\SystemConfigController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\Route;
 | system/config, and the literal system/resync/servers precedes the
 | system/resync action path.
 */
+
+// Compatibility and logging status — api/modules/system/status.yaml
+Route::get('status', [StatusController::class, 'show']);
 
 // Global configuration panels — api/modules/system/{sites,mail,dns,domains,misc}-config.yaml
 foreach (['sites', 'mail', 'dns', 'domains', 'misc'] as $section) {

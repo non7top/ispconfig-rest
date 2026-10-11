@@ -46,6 +46,17 @@ class SwaggerSpecServerTest extends TestCase
         $this->assertStringContainsString('Default security applied to every operation', $body);
     }
 
+    public function test_probes_and_status_are_documented(): void
+    {
+        $body = $this->specFor('https://real-host:8090/api/spec');
+
+        $this->assertStringContainsString('/livez:', $body);
+        $this->assertStringContainsString('/readyz:', $body);
+        $this->assertStringContainsString("'./modules/system/status.yaml#/~1status'", $body);
+
+        $this->get('/api/modules/system/status.yaml')->assertOk();
+    }
+
     public function test_http_endpoint_serves_the_spec(): void
     {
         $this->get('/api/spec')
