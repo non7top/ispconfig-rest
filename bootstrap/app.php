@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\ApiKeyAuth;
 use App\Http\Middleware\AttachChangeSetId;
+use App\Http\Middleware\RefuseWritesWhenIncompatible;
 use App\Http\Middleware\RequireAdmin;
 use App\Http\Middleware\RequireAdminOrReseller;
 use App\Http\Middleware\RequireClientLimit;
@@ -11,6 +12,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,11 +21,15 @@ return Application::configure(basePath: dirname(__DIR__))
         apiPrefix: 'api/v1',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function (): void {
+            Route::group([], base_path('routes/ops.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'api.key' => ApiKeyAuth::class,
             'change.set' => AttachChangeSetId::class,
+            'compat.writes' => RefuseWritesWhenIncompatible::class,
             'scope.admin' => RequireAdmin::class,
             'scope.reseller' => RequireAdminOrReseller::class,
             'scope.limit' => RequireClientLimit::class,
@@ -36,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // with 403 before any binding query runs.
         $middleware->priority([
             ApiKeyAuth::class,
+            RefuseWritesWhenIncompatible::class,
             AttachChangeSetId::class,
             RequireAdmin::class,
             RequireAdminOrReseller::class,

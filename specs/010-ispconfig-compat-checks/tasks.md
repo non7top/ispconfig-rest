@@ -86,15 +86,15 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ### Tests for User Story 2 (REQUIRED) ⚠️
 
-- [ ] T013 [P] [US2] Unit/feature test `tests/Feature/CompatibilityServiceTest.php`: level above, equal and below the minimum; no `server` row and null `dbversion` → `unknown`; database error → `unreachable`; `MIN(dbversion)` over several rows; the `ispc_info` row parsed (version, absent row → null); `version_compare` with the `3.3.1p1` suffix; only a compatible result is cached and an incompatible one is re-read on the next call (FR-010)
-- [ ] T014 [P] [US2] Feature test `tests/Feature/CompatRefuseWritesTest.php`: below-minimum POST/PUT/DELETE on one endpoint per module (clients, dns, mail, sites) returns 500 naming both levels with `found_dbversion` and `required_dbversion`, and writes no row to the ISPConfig table or `sys_datalog`; GET still 200; no key still 401 (not 500) and non-admin scope unchanged; level undeterminable refuses writes with the "could not be determined" detail; raising the level makes writes work again without a restart
+- [x] T013 [P] [US2] Unit/feature test `tests/Feature/CompatibilityServiceTest.php`: level above, equal and below the minimum; no `server` row and null `dbversion` → `unknown`; database error → `unreachable`; `MIN(dbversion)` over several rows; the `ispc_info` row parsed (version, absent row → null); `version_compare` with the `3.3.1p1` suffix; only a compatible result is cached and an incompatible one is re-read on the next call (FR-010)
+- [x] T014 [P] [US2] Feature test `tests/Feature/CompatRefuseWritesTest.php`: below-minimum POST/PUT/DELETE on one endpoint per module (clients, dns, mail, sites) returns 500 naming both levels with `found_dbversion` and `required_dbversion`, and writes no row to the ISPConfig table or `sys_datalog`; GET still 200; no key still 401 (not 500) and non-admin scope unchanged; level undeterminable refuses writes with the "could not be determined" detail; raising the level makes writes work again without a restart
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Implement `app/Services/CompatibilityService.php` per data-model `CompatReport` (`ok|incompatible|unknown|unreachable`): read `MIN(dbversion)` from `server`, the newest `monitor_data` row with `type = 'ispc_info'` through the existing defensive unserialize in `app/Services/MonitorDataService.php`, compare to `config('api.compat')`, cache only `ok` for `api.compat_cache_ttl`
-- [ ] T016 [US2] Create `app/Http/Middleware/RefuseWritesWhenIncompatible.php`: for non-safe methods ask `CompatibilityService` and throw `IncompatibleSchemaException` (found/required, or "unknown") when not compatible
-- [ ] T017 [US2] Register the alias `compat.writes` in `bootstrap/app.php` and add it to the `api.key` group in `routes/api.php` after `api.key` so unauthenticated callers still get 401 first
-- [ ] T018 [US2] Installer pre-flight in `install.sh`: after the DB credentials are resolved and before anything is written, read `ISPCONFIG_COMPAT` (`sed -n 's/^key=//p'`), read `MIN(dbversion)` from `server` with PDO using the resolved credentials, and exit non-zero with a message naming both levels when below the minimum; re-running the installer is the update path, so one check covers both (research R8)
+- [x] T015 [US2] Implement `app/Services/CompatibilityService.php` per data-model `CompatReport` (`ok|incompatible|unknown|unreachable`): read `MIN(dbversion)` from `server`, the newest `monitor_data` row with `type = 'ispc_info'` through the existing defensive unserialize in `app/Services/MonitorDataService.php`, compare to `config('api.compat')`, cache only `ok` for `api.compat_cache_ttl`
+- [x] T016 [US2] Create `app/Http/Middleware/RefuseWritesWhenIncompatible.php`: for non-safe methods ask `CompatibilityService` and throw `IncompatibleSchemaException` (found/required, or "unknown") when not compatible
+- [x] T017 [US2] Register the alias `compat.writes` in `bootstrap/app.php` and add it to the `api.key` group in `routes/api.php` after `api.key` so unauthenticated callers still get 401 first
+- [x] T018 [US2] Installer pre-flight in `install.sh`: after the DB credentials are resolved and before anything is written, read `ISPCONFIG_COMPAT` (`sed -n 's/^key=//p'`), read `MIN(dbversion)` from `server` with PDO using the resolved credentials, and exit non-zero with a message naming both levels when below the minimum; re-running the installer is the update path, so one check covers both (research R8)
 - [ ] T019 [US2] Verify the pre-flight against a copy of `dbispconfig` with `UPDATE server SET dbversion = dbversion - 6` (quickstart manual step 2): the installer stops before changing anything; record the result in this task's PR description
 
 **Checkpoint**: US1 and US2 work independently; the s24 orphan-client scenario is closed
@@ -129,20 +129,20 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ### Contract first (Principle I)
 
-- [ ] T024 [P] [US3] Author `api/modules/system/status.yaml` (`GET /status`, admin key, 200/401/403) and the `Status`, `Readiness`, `CheckState` schemas in `api/components/schemas/` from `contracts/api-probes-status.yaml`; register in `api/modules/system/_index.yaml`, `api/components/schemas/_index.yaml` and `api/openapi.yaml`; document `/livez` and `/readyz` (`security: []`, `servers: [{url: /}]`) in `api/openapi.yaml`
+- [x] T024 [P] [US3] Author `api/modules/system/status.yaml` (`GET /status`, admin key, 200/401/403) and the `Status`, `Readiness`, `CheckState` schemas in `api/components/schemas/` from `contracts/api-probes-status.yaml`; register in `api/modules/system/_index.yaml`, `api/components/schemas/_index.yaml` and `api/openapi.yaml`; document `/livez` and `/readyz` (`security: []`, `servers: [{url: /}]`) in `api/openapi.yaml`
 
 ### Tests for User Story 3 (REQUIRED) ⚠️
 
-- [ ] T025 [P] [US3] Feature test `tests/Feature/ProbeTest.php`: `/livez` is 200 with the database failing; `/readyz` is 200 when healthy with only per-check states (assert no version, level or hostname in the body); 503 with `schema` failed below the minimum; 503 with `database` failed; `logging: degraded` keeps 200; the response carries `Cache-Control: no-store`; no session cookie is set
-- [ ] T026 [P] [US3] Feature test `tests/Feature/StatusEndpointTest.php`: 401 without a key, 403 with a non-admin key, 200 with an admin key returning `compatible`, `ispconfig.{version,dbversion,required_dbversion,minimum_version}` and `logging.state`; `GET /` stays minimal and exposes no ISPConfig version or check result (FR-016)
-- [ ] T027 [P] [US3] Feature test `tests/Feature/DoctorCommandTest.php`: `ispconfig:doctor` prints one line per check, exits 0 when no check failed (degraded logging included), exits 1 on a failed check, and its log-directory write probe reports an unwritable directory
+- [x] T025 [P] [US3] Feature test `tests/Feature/ProbeTest.php`: `/livez` is 200 with the database failing; `/readyz` is 200 when healthy with only per-check states (assert no version, level or hostname in the body); 503 with `schema` failed below the minimum; 503 with `database` failed; `logging: degraded` keeps 200; the response carries `Cache-Control: no-store`; no session cookie is set
+- [x] T026 [P] [US3] Feature test `tests/Feature/StatusEndpointTest.php`: 401 without a key, 403 with a non-admin key, 200 with an admin key returning `compatible`, `ispconfig.{version,dbversion,required_dbversion,minimum_version}` and `logging.state`; `GET /` stays minimal and exposes no ISPConfig version or check result (FR-016)
+- [x] T027 [P] [US3] Feature test `tests/Feature/DoctorCommandTest.php`: `ispconfig:doctor` prints one line per check, exits 0 when no check failed (degraded logging included), exits 1 on a failed check, and its log-directory write probe reports an unwritable directory
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Implement `app/Services/HealthCheckService.php`: `database` (`SELECT 1`), `schema` (from `CompatibilityService`; `unknown` counts as failed), `migrations` (migration files versus the `migrations` table through the Migrator), `logging` (from `LogHealth`, never failing readiness); shared by probes, status and doctor
-- [ ] T029 [US3] Implement `app/Http/Controllers/ProbeController.php` (`livez`, `readyz`) and create `routes/ops.php`; load it through the `then:` hook of `withRouting` in `bootstrap/app.php` with no middleware group; leave `/up` untouched
-- [ ] T030 [US3] Implement `app/Http/Controllers/Api/V1/StatusController.php` and register `GET status` in `routes/api/system.php` inside the `scope.admin` group, before any parameterized route (ordering rule)
-- [ ] T031 [US3] Implement `app/Console/Commands/Doctor.php` (`ispconfig:doctor`, adds the log-directory write probe) and the `doctor` subcommand in `bin/ispconfig-rest` (`need_root`, runs as the run user like `key:create`)
+- [x] T028 [US3] Implement `app/Services/HealthCheckService.php`: `database` (`SELECT 1`), `schema` (from `CompatibilityService`; `unknown` counts as failed), `migrations` (migration files versus the `migrations` table through the Migrator), `logging` (from `LogHealth`, never failing readiness); shared by probes, status and doctor
+- [x] T029 [US3] Implement `app/Http/Controllers/ProbeController.php` (`livez`, `readyz`) and create `routes/ops.php`; load it through the `then:` hook of `withRouting` in `bootstrap/app.php` with no middleware group; leave `/up` untouched
+- [x] T030 [US3] Implement `app/Http/Controllers/Api/V1/StatusController.php` and register `GET status` in `routes/api/system.php` inside the `scope.admin` group, before any parameterized route (ordering rule)
+- [x] T031 [US3] Implement `app/Console/Commands/Doctor.php` (`ispconfig:doctor`, adds the log-directory write probe) and the `doctor` subcommand in `bin/ispconfig-rest` (`need_root`, runs as the run user like `key:create`)
 - [ ] T032 [US3] Verify in Swagger UI (`/api/documentation`) that `/api/v1/status` renders and matches the YAML, and that `GET /api/spec` still serves the multi-file spec (the existing Swagger spec test)
 
 **Checkpoint**: an orchestrator and an operator can see why the API refuses writes without reading a log or enabling debug mode
@@ -172,8 +172,8 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T038 [P] Update `README.md`: the Requirements line points at `ISPCONFIG_COMPAT` instead of repeating versions; document `/livez`, `/readyz`, `GET /api/v1/status`, `ispconfig-rest doctor`, the `incompatible-ispconfig-schema` problem and the log location `/var/log/ispconfig-rest/`
-- [ ] T039 Amend the constitution through `/speckit-constitution`: record the unauthenticated probe routes, and `/readyz` answering 503, as the documented exception to Principles IV and V (plan Complexity Tracking)
+- [x] T038 [P] Update `README.md`: the Requirements line points at `ISPCONFIG_COMPAT` instead of repeating versions; document `/livez`, `/readyz`, `GET /api/v1/status`, `ispconfig-rest doctor`, the `incompatible-ispconfig-schema` problem and the log location `/var/log/ispconfig-rest/`
+- [x] T039 Amend the constitution through `/speckit-constitution`: record the unauthenticated probe routes, and `/readyz` answering 503, as the documented exception to Principles IV and V (plan Complexity Tracking)
 - [ ] T040 Run the full suite (`php artisan test`, container) and the quickstart manual steps on a staging host; confirm no ISPConfig table or `sys_datalog` row is written by any new code path
 - [ ] T041 Record the Salt follow-ups in an issue (separate repository, no code here): create `/var/log/ispconfig-rest` for the run user, run `ispconfig-rest doctor` after any `dbispconfig` restore, and compare `.ispconfig-version` with `min_version`; multi-server stays a TODO
 

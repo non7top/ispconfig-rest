@@ -246,6 +246,21 @@ else ok "Using existing user $RUN_USER"; fi
 # Fetch code + dependencies
 # ---------------------------------------------------------------------------
 step "Fetching application code"
+# Refuse an ISPConfig database below the schema level the code supports
+# (ISPCONFIG_COMPAT, passed in as $1): the API never applies ISPConfig patches.
+check_ispconfig_schema() {
+  local min_db min_ver found
+  min_db="$(printf '%s\n' "$1" | sed -n 's/^min_dbversion=//p')"
+  min_ver="$(printf '%s\n' "$1" | sed -n 's/^min_version=//p')"
+  case "$min_db" in ''|*[!0-9]*) die "ISPCONFIG_COMPAT has no valid min_dbversion";; esac
+  found="$(ISPC_DSN="mysql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME" ISPC_USER="$DB_USER" ISPC_PASS="$DB_PASS" \
+    "$PHP_BIN" -r '$p=new PDO(getenv("ISPC_DSN"),getenv("ISPC_USER"),getenv("ISPC_PASS"),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]); echo $p->query("SELECT MIN(dbversion) FROM server")->fetchColumn();' 2>/dev/null)" \
+    || die "Cannot read the ISPConfig schema level (server.dbversion) from $DB_NAME"
+  case "$found" in ''|*[!0-9]*) die "The ISPConfig schema level in $DB_NAME could not be determined";; esac
+  [ "$found" -ge "$min_db" ] \
+    || die "ISPConfig schema level $found is below the required $min_db (ISPConfig $min_ver). Run ISPConfig's updater first; nothing was changed."
+  ok "ISPConfig schema level $found (requires $min_db)"
+}
 # Trust the tree system-wide: it is owned by $RUN_USER, but root (installer,
 # `ispconfig-rest status`) also runs git against it. Without this, git aborts
 # with "detected dubious ownership".
@@ -253,10 +268,13 @@ git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$INSTALL_D
   || git config --system --add safe.directory "$INSTALL_DIR"
 if [ -d "$INSTALL_DIR/.git" ]; then
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
+  # Checked before the tree is replaced, so a refused update leaves the running version untouched.
+  check_ispconfig_schema "$(git -C "$INSTALL_DIR" show "origin/$BRANCH:ISPCONFIG_COMPAT")"
   git -C "$INSTALL_DIR" checkout -f "$BRANCH"; git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
 else
   mkdir -p "$(dirname "$INSTALL_DIR")"
   git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  check_ispconfig_schema "$(cat "$INSTALL_DIR/ISPCONFIG_COMPAT")"
 fi
 chown -R "$RUN_USER":"$RUN_USER" "$INSTALL_DIR"
 ok "Code at $INSTALL_DIR ($(git -C "$INSTALL_DIR" rev-parse --short HEAD))"

@@ -1,0 +1,5 @@
+type: string
+enum: [ok, failed, degraded, unknown]
+description: >-
+  State of one readiness check. `degraded` is reported for logging only and
+  never fails readiness; `unknown` is a check that could not be evaluated.

@@ -1,0 +1,28 @@
+type: object
+description: ISPConfig compatibility and logging state behind the readiness probe (administrator keys only).
+required: [compatible, ispconfig, logging]
+properties:
+  compatible:
+    type: boolean
+  ispconfig:
+    type: object
+    required: [dbversion, required_dbversion, minimum_version]
+    properties:
+      version:
+        type: string
+        nullable: true
+        description: ISPC_APP_VERSION from monitor_data; null when no ispc_info row exists. Informational only.
+      dbversion:
+        type: integer
+        nullable: true
+        description: The schema level found in server.dbversion; null when it cannot be read.
+      required_dbversion:
+        type: integer
+      minimum_version:
+        type: string
+  logging:
+    type: object
+    required: [state]
+    properties:
+      state:
+        $ref: './CheckState.yaml'

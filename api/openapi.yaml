@@ -128,6 +128,12 @@ components:
       $ref: './components/schemas/ServerFastCgiConfig.yaml'
     ServerStatus:
       $ref: './components/schemas/ServerStatus.yaml'
+    Status:
+      $ref: './components/schemas/Status.yaml'
+    Readiness:
+      $ref: './components/schemas/Readiness.yaml'
+    CheckState:
+      $ref: './components/schemas/CheckState.yaml'
     ServerFirewall:
       $ref: './components/schemas/ServerFirewall.yaml'
     ServerIp:
@@ -212,6 +218,8 @@ components:
       $ref: './components/responses/InternalServerError.yaml'
     UnprocessableEntity:
       $ref: './components/responses/UnprocessableEntity.yaml'
+    IncompatibleSchema:
+      $ref: './components/responses/IncompatibleSchema.yaml'
 
   # Reusable response headers
   headers:
@@ -220,6 +228,63 @@ components:
 
 # Include all paths from modules
 paths:
+  # Probes (spec 010): unauthenticated, served at the site root, not under /api/v1
+  /livez:
+    get:
+      tags:
+        - System
+      summary: Liveness probe
+      description: >-
+        The process can answer requests. Depends on nothing: stays 200 while the
+        database is down. Unauthenticated; exposes no data.
+      operationId: getLivez
+      security: []
+      servers:
+        - url: /
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+  /readyz:
+    get:
+      tags:
+        - System
+      summary: Readiness probe
+      description: >-
+        200 only when the database is reachable, the ISPConfig schema level is
+        compatible and the API's own migrations are applied. Per-check states
+        only; no versions or levels. `logging: degraded` does not fail readiness.
+        Unauthenticated.
+      operationId: getReadyz
+      security: []
+      servers:
+        - url: /
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: './components/schemas/Readiness.yaml'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: './components/schemas/Readiness.yaml'
+
+  # System status (spec 010)
+  /status:
+    $ref: './modules/system/status.yaml#/~1status'
+
   # Client module paths
   /clients:
     $ref: './modules/client/clients.yaml#/~1clients'

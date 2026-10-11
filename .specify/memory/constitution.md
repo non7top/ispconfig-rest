@@ -33,14 +33,14 @@ Before implementing business logic, locate the legacy implementation in `source_
 
 ### IV. Layered Flow & Route Discipline
 
-Request flow: routes (`routes/api.php` on Laravel; legacy `routes/web.php` until ported) → middleware (API-key auth, request shaping) → controller in `App\Http\Controllers\Api\V1` → model/service. Controllers use the RESTful method set `index / show / store / update / destroy` and stay thin — validation via Form Requests (Laravel) or `$this->validate()`, business logic in `app/Services/`. All routes live in the versioned, authenticated group (`API_PREFIX`, default `api/v1`); **specific routes MUST precede general ones** to prevent shadowing.
+Request flow: routes (`routes/api.php` on Laravel; legacy `routes/web.php` until ported) → middleware (API-key auth, request shaping) → controller in `App\Http\Controllers\Api\V1` → model/service. Controllers use the RESTful method set `index / show / store / update / destroy` and stay thin — validation via Form Requests (Laravel) or `$this->validate()`, business logic in `app/Services/`. All routes live in the versioned, authenticated group (`API_PREFIX`, default `api/v1`); **specific routes MUST precede general ones** to prevent shadowing. Exception (spec 010): the unauthenticated orchestrator probes `/livez` and `/readyz` live at the site root in `routes/ops.php`, without a middleware group; they expose per-check states only, never data, versions or credentials.
 
 ### V. HTTP Contract (Industry-Standard Conventions)
 
 - **List responses**: `{ "data": [...], "meta": { "total": n, "limit": n, "offset": n } }` with `limit`/`offset`/`sort`/`order` query parameters (shared components).
 - **Single resources**: the resource object as `data` or bare object per the shared response components — one shape project-wide, defined once in `api/components/`.
 - **Errors**: **RFC 9457 `application/problem+json`** — `{ "type", "title", "status", "detail" }`, plus an `errors` map for 422 validation failures. No ad-hoc `{message, error}` bodies.
-- **Status codes**: 200 read/update, **201 create**, **204 delete**, 400/401/403/404/409/422 as problem+json, 500 for unexpected failures. Never 202.
+- **Status codes**: 200 read/update, **201 create**, **204 delete**, 400/401/403/404/409/422 as problem+json, 500 for unexpected failures (an incompatible ISPConfig schema is a typed 500, not 503, since the API cannot tell whether it will clear). Never 202. Exception: `/readyz` answers 503 when not ready, as orchestrators expect.
 - **Auth**: `X-API-Key` header (`apiKeyAuth` scheme in OpenAPI). Keys validated against ISPConfig's permission model (`can_use_api`), stored **hashed at rest**. No basic auth.
 - **Field normalization**: custom Eloquent casts (e.g., `YesNoBoolean` for `y`/`n` columns) — API speaks booleans/ISO dates, database keeps ISPConfig's native formats.
 
@@ -89,9 +89,11 @@ Before a feature is considered done:
 
 This constitution supersedes generic habits and v1 where they conflict. Amendments go through `/speckit-constitution` and must cite either a detected convention or an explicit owner decision. Decision log: Laravel 12, pragmatic-REST conventions, in-place rebuild, and mandatory tests were chosen by the project owner on 2026-07-04 (reboot decisions). Intentionally unregulated: dev-server/runtime environment policy, commit-message format beyond existing style.
 
-**Version**: 2.0.0 | **Ratified**: 2026-07-04 | **Last Amended**: 2026-07-04
+**Version**: 2.1.0 | **Ratified**: 2026-07-04 | **Last Amended**: 2026-10-11
 
 <!--
+2.1.0 (2026-10-11): Principle IV and V gain the spec 010 probe exception (unauthenticated
+/livez and /readyz at the site root; /readyz may answer 503). Owner-approved with spec 010.
 2.0.0 (2026-07-04): Reboot constitution — target Laravel 12/PHP 8.3+; Principle V
 rewritten to pragmatic REST ({data,meta} envelope, RFC 9457 problem+json, hashed
 X-API-Key); tests now REQUIRED; Principle II gains a documented-exceptions clause
