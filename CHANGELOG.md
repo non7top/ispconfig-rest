@@ -9,6 +9,10 @@ the HTTP API remains under `/api/v1`.
 
 - Dependabot opens weekly, grouped update PRs for Composer packages and GitHub Actions.
 
+### Fixed
+
+- The installer preflight also checks for the PHP `phar` extension, which Composer needs.
+
 ## [1.4.0] - 2026-10-17
 
 Domains without hosting can be removed with their services. No migrations. Requires PHP 8.3 or newer and ISPConfig
