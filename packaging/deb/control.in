@@ -1,0 +1,20 @@
+Package: ispconfig-rest
+Version: @VERSION@
+Architecture: all
+Maintainer: Vladimir Berezhnoy <non7top@gmail.com>
+Section: admin
+Priority: optional
+Installed-Size: @SIZE@
+Homepage: https://github.com/non7top/ispconfig-rest
+Description: REST API for ISPConfig
+ A contract-first REST API in front of an ISPConfig 3.3 database; it
+ journals every change through sys_datalog and never writes ISPConfig's
+ own tables directly.
+ .
+ The package ships the application with its dependencies built, the
+ ispconfig-rest manager, a system user and the /var/log and /var/cache
+ directories. It writes no configuration and runs no migration: the
+ environment file in /etc/ispconfig-rest, the php-fpm pool and the web
+ server are set up by the administrator, then `ispconfig-rest migrate`
+ creates the API's own table. A PHP 8.3 or newer command line is needed
+ for the manager and is not a declared dependency.
