@@ -193,7 +193,7 @@ PHP_VER="$("$PHP_BIN" -r 'echo PHP_VERSION;')"
 ok "PHP $PHP_VER"
 
 MISSING_EXT=""
-for ext in pdo_mysql mbstring openssl tokenizer xml ctype json bcmath fileinfo; do
+for ext in pdo_mysql mbstring openssl tokenizer xml ctype json bcmath fileinfo phar; do
   "$PHP_BIN" -m | grep -qix "$ext" || MISSING_EXT="$MISSING_EXT $ext"
 done
 [ -z "$MISSING_EXT" ] || die "Missing PHP extensions:$MISSING_EXT"
