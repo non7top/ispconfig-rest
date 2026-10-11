@@ -4,11 +4,12 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | API version reported by the root endpoint
+    | Release version reported by the root endpoint
     |--------------------------------------------------------------------------
+    | Read from the VERSION file, so it always matches the deployed release.
     */
 
-    'version' => env('API_VERSION', '1.0'),
+    'version' => trim((string) @file_get_contents(base_path('VERSION'))) ?: 'unknown',
 
     /*
     |--------------------------------------------------------------------------
