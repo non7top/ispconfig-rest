@@ -1,6 +1,6 @@
 # Quickstart: verifying spec 060
 
 1. **Migrate command**: against a scratch MySQL database with the ISPConfig `server` table at level 101 or higher, run `ispconfig-rest migrate --check` (exit 2 when `api_keys` is missing), `ispconfig-rest migrate` (exit 0, prints `applied …` and the empty-table line), then both again (exit 0, `up to date`). With `server.dbversion` below 101 it exits 1 and changes nothing.
-2. **Environment path**: put `.env` in `/etc/ispconfig-rest/` with the packaged tree mounted read-only and request `GET /readyz`.
+2. **Environment path**: put `.env` in `/etc/ispconfig-rest/` and run, with the tree mounted read-only and a different `.env` inside it: `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/app:ro -v /path/to/etc:/etc/ispconfig-rest:ro -w /app composer:2 php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo config("app.name"), "|", $app->environmentPath();'`. It prints the name from the `/etc` file and `/etc/ispconfig-rest`.
 3. **Package**: `scripts/build-deb.sh <version>` then `scripts/test-deb.sh` (container); check the user, the directories and their modes, and `GET /` reporting the version.
 4. **Release**: push a test tag to a fork; the workflow produces the signed repository; `cosign verify-blob` on the `.deb` bundle against the workflow identity passes.
