@@ -7,6 +7,7 @@ use App\Exceptions\ProblemAuthorizationException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
@@ -83,6 +84,10 @@ class Problem
             return self::response(403, 'Forbidden', $detail);
         }
 
+        if ($e instanceof QueryException && ($missing = self::missingSchemaObject($e)) !== null) {
+            $e = $missing;
+        }
+
         if ($e instanceof IncompatibleSchemaException) {
             return self::response(500, 'Incompatible ISPConfig schema', $e->getMessage(), [
                 'type' => ProblemType::uri(ProblemType::INCOMPATIBLE_SCHEMA),
@@ -104,5 +109,50 @@ class Problem
         $detail = config('app.debug') ? $e->getMessage() : null;
 
         return self::response(500, 'Internal server error', $detail);
+    }
+
+    /**
+     * Unknown column (42S22) or table (42S02): the ISPConfig schema is older
+     * than the API. Only identifiers are lifted from the driver message and the
+     * statement; the SQL itself is never copied (spec 010 FR-001).
+     */
+    private static function missingSchemaObject(QueryException $e): ?IncompatibleSchemaException
+    {
+        $state = $e->errorInfo[0] ?? null;
+        $driverMessage = (string) ($e->errorInfo[2] ?? '');
+        $prefix = 'The ISPConfig database schema is older than this API expects: ';
+        $hint = " Run ISPConfig's updater.";
+
+        if ($state === '42S22') {
+            $column = preg_match("/Unknown column '([\w.]+)'/", $driverMessage, $m) ? $m[1] : null;
+            $table = null;
+
+            if ($column !== null && str_contains($column, '.')) {
+                [$table, $column] = array_slice(explode('.', $column), -2);
+            }
+
+            $table ??= self::tableOf($e->getSql());
+            $subject = match (true) {
+                $table !== null && $column !== null => "table {$table} is missing column {$column}",
+                $column !== null => "column {$column} is missing",
+                default => 'a required column is missing',
+            };
+
+            return new IncompatibleSchemaException($prefix.$subject.'.'.$hint, $table, $column);
+        }
+
+        if ($state === '42S02') {
+            $table = preg_match("/Table '(?:\w+\.)?(\w+)' doesn't exist/", $driverMessage, $m) ? $m[1] : self::tableOf($e->getSql());
+            $subject = $table !== null ? "table {$table} is missing" : 'a required table is missing';
+
+            return new IncompatibleSchemaException($prefix.$subject.'.'.$hint, $table);
+        }
+
+        return null;
+    }
+
+    private static function tableOf(string $sql): ?string
+    {
+        return preg_match('/\b(?:insert\s+into|update|from)\s+[`"]?(\w+)[`"]?/i', $sql, $m) ? $m[1] : null;
     }
 }
