@@ -23,6 +23,8 @@ final class ProblemType
 
     public const VALIDATION_FAILED = 'validation-failed';
 
+    public const INCOMPATIBLE_SCHEMA = 'incompatible-ispconfig-schema';
+
     /** Every documented name, in docs/problems.md order. */
     public const NAMES = [
         self::ACCOUNT_LOCKED,
@@ -31,6 +33,7 @@ final class ProblemType
         self::FEATURE_NOT_ALLOWED,
         self::SERVER_NOT_ASSIGNED,
         self::VALIDATION_FAILED,
+        self::INCOMPATIBLE_SCHEMA,
     ];
 
     public static function uri(string $name): string

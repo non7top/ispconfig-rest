@@ -74,3 +74,20 @@ DNS, secondary DNS) is assigned. Unassigned and nonexistent servers are reported
 
 One or more fields are invalid. `errors` maps each field to its messages. `error_types` maps fields whose error is a
 `feature-not-allowed` or `server-not-assigned` refusal to that type URI; it is absent when no field has a typed error.
+
+## incompatible-ispconfig-schema
+
+**Status**: 500
+
+The ISPConfig database schema does not match what this API needs: a table or column is missing, or the schema level
+(`server.dbversion`) is below the supported minimum in `ISPCONFIG_COMPAT`. The API cannot tell whether this will clear,
+so it makes no claim of being temporary; run ISPConfig's updater on the server. Never contains SQL, bound values or
+connection details.
+
+Extension members, by case:
+
+| Case | Members |
+|------|---------|
+| A query hit a missing column or table | `table` (when it can be determined), `column` (for a missing column) |
+| Writes refused below the minimum level | `found_dbversion`, `required_dbversion` |
+| The level could not be read | `required_dbversion` |
