@@ -55,16 +55,16 @@ The package ships `ispconfig-rest migrate`, a command that applies the API's own
 
 ### User Story 3 - The package owns the system user, the /var directories and their permissions (Priority: P2)
 
-Installing the package creates the service's system user and group, `/var/log/ispconfig-rest` and `/var/cache/ispconfig-rest` with the right owner and mode, and a logrotate policy. It writes no configuration and runs no migration.
+Installing the package creates the service's system user and group, `/var/log/ispconfig-rest` and `/var/cache/ispconfig-rest` with the right owner and mode, and a boot-time declaration that recreates them. It writes no configuration and runs no migration. The application rotates its own log (daily, 14 days), so no logrotate policy is shipped.
 
 **Why this priority**: These are fixed facts of the deployment today created by `install.sh`; Salt should not have to know them, and a package upgrade must restore them if they are missing.
 
-**Independent Test**: Install the package in a clean container: the user and group exist, both directories exist with the declared owner and mode, the logrotate file is in place. Remove the directories and reinstall or run the tmpfiles step: they come back.
+**Independent Test**: Install the package in a clean container: the user and group exist and both directories exist with the declared owner and mode. Remove the directories and reinstall or run the tmpfiles step: they come back.
 
 **Acceptance Scenarios**:
 
-1. **Given** a clean host, **When** the package is installed, **Then** the user, group, directories and logrotate policy exist and nothing else under `/etc` is written.
-2. **Given** the package is removed, **When** the host is inspected, **Then** `.env`, the logs and the database are untouched; purge removes the cache directory and the system user only.
+1. **Given** a clean host, **When** the package is installed, **Then** the user, group and directories exist and nothing under `/etc` is written by the package except the empty configuration directory.
+2. **Given** the package is removed, **When** the host is inspected, **Then** `.env`, the logs and the database are untouched; purge removes the cache directory only; the system user and group stay, as Debian policy asks.
 3. **Given** a directory deleted by hand, **When** the package is upgraded or the tmpfiles step runs, **Then** it is recreated with the right owner and mode.
 
 ---
@@ -131,7 +131,7 @@ No REST endpoints change. `GET /` reports the package version (the `VERSION` fil
 - **FR-001**: The release workflow MUST build one architecture-independent package per tag, from a tree with production dependencies only, and MUST fail when the tag differs from `VERSION`.
 - **FR-002**: The package MUST install without git, composer or network access and MUST contain the application, its `vendor/` tree, `VERSION`, `ISPCONFIG_COMPAT`, `bin/` and `api/`.
 - **FR-003**: Package files, the publication metadata and the package MUST be signed so that `apt-cosign` verifies them against the release workflow identity of this repository.
-- **FR-004**: The package MUST create the service user and group, `/var/log/ispconfig-rest` and `/var/cache/ispconfig-rest` with their owner and mode, and a logrotate policy, and MUST NOT write the environment file, the web-server or php-fpm configuration, or run a migration.
+- **FR-004**: The package MUST create the service user and group, `/var/log/ispconfig-rest` and `/var/cache/ispconfig-rest` with their owner and mode, and a boot-time declaration that recreates them, and MUST NOT write the environment file, the web-server or php-fpm configuration, or run a migration.
 - **FR-005**: The application MUST read its environment file from a configuration directory outside the packaged tree and MUST NOT write inside the packaged tree at runtime.
 - **FR-006**: `ispconfig-rest migrate` MUST apply the API's pending migrations with a privileged database login supplied through environment variables or options, MUST be idempotent (a second run changes nothing and exits 0), and MUST never prompt.
 - **FR-007**: `ispconfig-rest migrate --check` MUST write nothing and MUST exit 0 when nothing is pending, 2 when something is pending and 1 on any error.
@@ -144,7 +144,7 @@ No REST endpoints change. `GET /` reports the package version (the `VERSION` fil
 ### Key Entities
 
 - **Release tag**: the calendar version (`YYYY.MM.DD`, `.N` for a second release the same day); equals `VERSION`.
-- **Package**: the signed `.deb` built from a tag; ships files, the system-user and directory declarations and the logrotate policy.
+- **Package**: the signed `.deb` built from a tag; ships files and the system-user and directory declarations.
 - **Migration command**: `ispconfig-rest migrate [--check]`; the only thing that runs the API's migrations.
 - **Runtime layout**: read-only application tree, configuration directory, `/var/log/ispconfig-rest`, `/var/cache/ispconfig-rest`.
 
@@ -167,8 +167,10 @@ No REST endpoints change. `GET /` reports the package version (the `VERSION` fil
 - Spec 010's checks stay as they are: the compat check, `doctor`, `/readyz` and the installer's schema pre-flight.
 - `install.sh` stays as the non-package path; its migration step is replaced by a call to the same command so both paths run one implementation.
 
-### Open questions
+### Decisions taken as defaults
 
-- [NEEDS CLARIFICATION: Which system user runs the application: a dedicated package-owned user (the php-fpm pool then runs as it) or, as `install.sh` does today, the web-server user? Default if unanswered: a dedicated user.]
-- [NEEDS CLARIFICATION: How is the apt repository published and hosted (GitHub release assets, GitHub Pages or other) under the `apt-cosign` model? Default if unanswered: whatever `apt-cosign-sign` documents for a GitHub-hosted source.]
-- [NEEDS CLARIFICATION: Does the package declare a dependency on a PHP CLI of at least 8.3? The migration, `doctor` and key commands run through the PHP CLI (`artisan`), which the php-fpm package does not provide; but a hard dependency fails where PHP is not a distribution package. Default if unanswered: no hard dependency; the manager uses the configured PHP binary and `doctor` reports a PHP that is too old.]
+These were open; the maintainer had not answered, so the stated defaults are used and can be changed before the slices merge.
+
+- **Run user**: a dedicated, package-owned system user and group `ispconfig-rest`; the php-fpm pool Salt writes runs as it. `install.sh` keeps using the web-server user.
+- **Repository hosting**: the `apt-cosign` model: a flat repository force-published to a dedicated `apt-repo` branch, served by `raw.githubusercontent.com`, every file signed by the release workflow's GitHub Actions identity.
+- **PHP dependency**: no hard `Depends` on a PHP CLI. The migration, `doctor` and key commands run through the PHP CLI (`artisan`), which the php-fpm package does not provide, so the manager uses the PHP binary Salt configures and `doctor` reports a PHP that is too old.

@@ -12,7 +12,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain (3 open: run user, repository hosting, PHP dependency; each has a default)
+- [x] No [NEEDS CLARIFICATION] markers remain (run user, repository hosting and PHP dependency were taken as stated defaults)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] All acceptance scenarios are defined
@@ -27,4 +27,4 @@
 
 ## Notes
 
-- The three open questions are for the maintainer before `/speckit-plan`.
+- The three defaults are listed under "Decisions taken as defaults" in the spec.
