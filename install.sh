@@ -302,7 +302,6 @@ BROADCAST_CONNECTION=null
 FILESYSTEM_DISK=local
 MAIL_MAILER=log
 
-API_VERSION=1.0
 # No dev key in production — mint keys with: ispconfig-rest key:create
 API_DEV_KEY=
 EOF
