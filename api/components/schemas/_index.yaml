@@ -224,3 +224,9 @@ ChangeSet:
 
 WebDomainSslStatus:
   $ref: './WebDomainSslStatus.yaml'
+
+ProblemLimit:
+  $ref: './ProblemLimit.yaml'
+
+ForbiddenProblem:
+  $ref: './ForbiddenProblem.yaml'

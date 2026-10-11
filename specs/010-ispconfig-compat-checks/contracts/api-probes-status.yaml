@@ -1,0 +1,120 @@
+# Contract draft for spec 010. To be split into api/ when implementation starts:
+#   - paths /api/v1/status  -> api/modules/system/status.yaml (+ api/openapi.yaml entry)
+#   - /livez, /readyz       -> api/openapi.yaml with a path-level `servers: [{url: /}]`
+#   - components            -> api/components/schemas/Status.yaml, Readiness.yaml,
+#                              api/components/responses/IncompatibleSchema.yaml
+paths:
+  /livez:
+    get:
+      summary: Liveness probe
+      description: >-
+        The process can answer requests. Depends on nothing: stays 200 while the
+        database is down. Unauthenticated; exposes no data.
+      operationId: getLivez
+      security: []
+      servers: [{ url: / }]
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+  /readyz:
+    get:
+      summary: Readiness probe
+      description: >-
+        200 only when the database is reachable, the ISPConfig schema level is
+        compatible and the API's own migrations are applied. Per-check states
+        only; no versions or levels. `logging: degraded` does not fail readiness.
+        Unauthenticated.
+      operationId: getReadyz
+      security: []
+      servers: [{ url: / }]
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Readiness' }
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Readiness' }
+  /api/v1/status:
+    get:
+      summary: Compatibility and logging status
+      description: Administrator keys only. Full numbers behind /readyz.
+      operationId: getStatus
+      security: [{ apiKeyAuth: [] }]
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Status' }
+        '401': { $ref: '../../components/responses/Unauthorized.yaml' }
+        '403': { $ref: '../../components/responses/Forbidden.yaml' }
+components:
+  responses:
+    IncompatibleSchema:
+      description: >-
+        The ISPConfig database schema is older than this API requires, or a
+        required table or column is missing. Returned for every write while the
+        level is below the minimum, and for a missing column/table error.
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status]
+            properties:
+              type:
+                type: string
+                description: ProblemType::uri('incompatible-ispconfig-schema'), the catalogue URL ending in #incompatible-ispconfig-schema
+                pattern: '#incompatible-ispconfig-schema$'
+              title: { type: string }
+              status: { type: integer, enum: [503] }
+              detail: { type: string }
+              table: { type: string, description: Present when determinable }
+              column: { type: string, description: Present for a missing column }
+              found_dbversion: { type: integer }
+              required_dbversion: { type: integer }
+  schemas:
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ok, unavailable] }
+        checks:
+          type: object
+          required: [database, schema, migrations, logging]
+          properties:
+            database: { $ref: '#/components/schemas/CheckState' }
+            schema: { $ref: '#/components/schemas/CheckState' }
+            migrations: { $ref: '#/components/schemas/CheckState' }
+            logging: { $ref: '#/components/schemas/CheckState' }
+    CheckState:
+      type: string
+      enum: [ok, failed, degraded, unknown]
+    Status:
+      type: object
+      required: [compatible, ispconfig, logging]
+      properties:
+        compatible: { type: boolean }
+        ispconfig:
+          type: object
+          required: [dbversion, required_dbversion]
+          properties:
+            version: { type: string, nullable: true, description: 'ISPC_APP_VERSION from monitor_data; null when no ispc_info row' }
+            dbversion: { type: integer, nullable: true }
+            required_dbversion: { type: integer }
+            minimum_version: { type: string }
+        logging:
+          type: object
+          required: [state]
+          properties:
+            state: { $ref: '#/components/schemas/CheckState' }
