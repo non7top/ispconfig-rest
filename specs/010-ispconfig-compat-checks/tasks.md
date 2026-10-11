@@ -36,8 +36,8 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 **Purpose**: the single source of truth and the shared configuration exist before any PHP uses them
 
-- [ ] T001 Create `ISPCONFIG_COMPAT` at the repository root with `min_dbversion=100`, `min_version=3.3.1p1`, `tested_version=3.3.1p1` and explanatory `#` comments, in the format of `contracts/compat-file-and-doctor.md` (the optional `schema_tarball_sha256` is added by T033)
-- [ ] T002 [P] Add `API_COMPAT_CACHE_TTL=60` and `LOG_PATH=` (commented default `storage/logs/ispconfig-rest.log`) with one-line comments to `.env.example`
+- [x] T001 Create `ISPCONFIG_COMPAT` at the repository root with `min_dbversion=100`, `min_version=3.3.1p1`, `tested_version=3.3.1p1` and explanatory `#` comments, in the format of `contracts/compat-file-and-doctor.md` (the optional `schema_tarball_sha256` is added by T033)
+- [x] T002 [P] Add `API_COMPAT_CACHE_TTL=60` and `LOG_PATH=` (commented default `storage/logs/ispconfig-rest.log`) with one-line comments to `.env.example`
 
 ---
 
@@ -47,12 +47,12 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 **⚠️ CRITICAL**: no user story work can begin until this phase is complete
 
-- [ ] T003 Implement `App\Support\IspconfigCompat::load()` in `app/Support/IspconfigCompat.php`: parse `ISPCONFIG_COMPAT` (`key=value`, `#` comments, blank lines), require `min_dbversion` (int ≥ 1), `min_version`, `tested_version`, accept optional `schema_tarball_sha256` (64 hex), reject unknown keys, and throw an error that names the file for a missing file, a missing key or a malformed value (FR-004–FR-006)
-- [ ] T004 [P] Unit test `tests/Unit/IspconfigCompatTest.php`: valid file, comments and blank lines, missing file, missing key, non-integer level, bad sha256, unknown key (each error names `ISPCONFIG_COMPAT`)
-- [ ] T005 Add the `compat` block to `config/api.php`: `compat` => `IspconfigCompat::load()` result, `compat_cache_ttl` => `env('API_COMPAT_CACHE_TTL', 60)`; keep the existing `VERSION` read untouched
-- [ ] T006 Register the problem type: add `INCOMPATIBLE_SCHEMA = 'incompatible-ispconfig-schema'` to `app/Support/ProblemType.php` (constant and `NAMES`) and an `incompatible-ispconfig-schema` section (status 500, members `table`, `column`, `found_dbversion`, `required_dbversion`) to `docs/problems.md`; keep the catalogue-versus-documentation consistency test green
-- [ ] T007 Create `app/Exceptions/IncompatibleSchemaException.php` carrying either table/column or found/required levels (or "level unknown"), with a message that never contains SQL; render it in `app/Support/Problem.php` as a 500 problem with `type` = `ProblemType::uri(ProblemType::INCOMPATIBLE_SCHEMA)` and the members above
-- [ ] T008 [P] Author `api/components/responses/IncompatibleSchema.yaml` from `contracts/api-probes-status.yaml` and register it in the responses index; reference it from the 500 responses added later
+- [x] T003 Implement `App\Support\IspconfigCompat::load()` in `app/Support/IspconfigCompat.php`: parse `ISPCONFIG_COMPAT` (`key=value`, `#` comments, blank lines), require `min_dbversion` (int ≥ 1), `min_version`, `tested_version`, accept optional `schema_tarball_sha256` (64 hex), reject unknown keys, and throw an error that names the file for a missing file, a missing key or a malformed value (FR-004–FR-006)
+- [x] T004 [P] Unit test `tests/Unit/IspconfigCompatTest.php`: valid file, comments and blank lines, missing file, missing key, non-integer level, bad sha256, unknown key (each error names `ISPCONFIG_COMPAT`)
+- [x] T005 Add the `compat` block to `config/api.php`: `compat` => `IspconfigCompat::load()` result, `compat_cache_ttl` => `env('API_COMPAT_CACHE_TTL', 60)`; keep the existing `VERSION` read untouched
+- [x] T006 Register the problem type: add `INCOMPATIBLE_SCHEMA = 'incompatible-ispconfig-schema'` to `app/Support/ProblemType.php` (constant and `NAMES`) and an `incompatible-ispconfig-schema` section (status 500, members `table`, `column`, `found_dbversion`, `required_dbversion`) to `docs/problems.md`; keep the catalogue-versus-documentation consistency test green
+- [x] T007 Create `app/Exceptions/IncompatibleSchemaException.php` carrying either table/column or found/required levels (or "level unknown"), with a message that never contains SQL; render it in `app/Support/Problem.php` as a 500 problem with `type` = `ProblemType::uri(ProblemType::INCOMPATIBLE_SCHEMA)` and the members above
+- [x] T008 [P] Author `api/components/responses/IncompatibleSchema.yaml` from `contracts/api-probes-status.yaml` and register it in the responses index; reference it from the 500 responses added later
 
 **Checkpoint**: loader, config, problem type and exception exist; stories can start
 
@@ -66,13 +66,13 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ### Tests for User Story 1 (REQUIRED) ⚠️
 
-- [ ] T009 [P] [US1] Feature test `tests/Feature/CompatMissingColumnTest.php`: `42S22` with an `insert into "web_domain"` statement returns 500, `application/problem+json`, `type` ending `#incompatible-ispconfig-schema`, `table` = `web_domain`, `column` = `disable_symlinknotowner`; `42S02` returns 500 naming the table; a qualified column (`web_domain.x`) names table and column; an unparseable statement names the column only; the body contains no SQL text, binding, host or credential (assert on the whole JSON string); any other SQLSTATE (deadlock `40001`, integrity `23000`) stays the generic untyped 500 with `detail` hidden unless `app.debug`
-- [ ] T010 [P] [US1] In the same test class assert the full exception, including its SQL, is still reported to the log (`Log::spy()` or a log handler assertion) while the response stays clean (US1 scenario 4)
+- [x] T009 [P] [US1] Feature test `tests/Feature/CompatMissingColumnTest.php`: `42S22` with an `insert into "web_domain"` statement returns 500, `application/problem+json`, `type` ending `#incompatible-ispconfig-schema`, `table` = `web_domain`, `column` = `disable_symlinknotowner`; `42S02` returns 500 naming the table; a qualified column (`web_domain.x`) names table and column; an unparseable statement names the column only; the body contains no SQL text, binding, host or credential (assert on the whole JSON string); any other SQLSTATE (deadlock `40001`, integrity `23000`) stays the generic untyped 500 with `detail` hidden unless `app.debug`
+- [x] T010 [P] [US1] In the same test class assert the full exception, including its SQL, is still reported to the log (`Log::spy()` or a log handler assertion) while the response stays clean (US1 scenario 4)
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Add the `QueryException` branch to `Problem::fromThrowable` in `app/Support/Problem.php`: read SQLSTATE from `$e->errorInfo[0]`, extract the column from the MySQL message (`Unknown column '<col>'`, possibly `tbl.col`), take the table from the qualified column or from the first identifier after `insert into` / `update` / `from` in the server-side SQL, then throw/return the T007 problem; never copy SQL or bindings into the response (research R4)
-- [ ] T012 [US1] Confirm in `bootstrap/app.php` that the render hook does not suppress reporting of `QueryException` (no `dontReport`); fix only if T010 fails
+- [x] T011 [US1] Add the `QueryException` branch to `Problem::fromThrowable` in `app/Support/Problem.php`: read SQLSTATE from `$e->errorInfo[0]`, extract the column from the MySQL message (`Unknown column '<col>'`, possibly `tbl.col`), take the table from the qualified column or from the first identifier after `insert into` / `update` / `from` in the server-side SQL, then throw/return the T007 problem; never copy SQL or bindings into the response (research R4)
+- [x] T012 [US1] Confirm in `bootstrap/app.php` that the render hook does not suppress reporting of `QueryException` (no `dontReport`); fix only if T010 fails
 
 **Checkpoint**: US1 works alone; the s24 failure now reads "table web_domain is missing column disable_symlinknotowner"
 
@@ -109,13 +109,13 @@ description: "Task list for spec 010: ISPConfig compatibility checks and failure
 
 ### Tests for User Story 4 (REQUIRED) ⚠️
 
-- [ ] T020 [P] [US4] Feature test `tests/Feature/LoggingResilienceTest.php`: a writable `LOG_PATH` receives one full entry per exception; an unwritable path falls back to the error-log handler and the response is unchanged; both destinations failing leaves the response unchanged and raises no second exception; the log probe reports `ok` / `degraded` for writable / unwritable directories
+- [x] T020 [P] [US4] Feature test `tests/Feature/LoggingResilienceTest.php`: a writable `LOG_PATH` receives one full entry per exception; an unwritable path falls back to the error-log handler and the response is unchanged; both destinations failing leaves the response unchanged and raises no second exception; the log probe reports `ok` / `degraded` for writable / unwritable directories
 
 ### Implementation for User Story 4
 
-- [ ] T021 [US4] Implement `app/Support/Logging/ResilientLogger.php` (a `via` class): Monolog `FallbackGroupHandler` of `RotatingFileHandler(LOG_PATH, 14 days)` then `ErrorLogHandler`, wrapped so any handler exception is swallowed (FR-020); add the channel to `config/logging.php` with `LOG_PATH` defaulting to `storage/logs/ispconfig-rest.log` and make it the default for the application
-- [ ] T022 [P] [US4] Implement the log probe `app/Support/Logging/LogHealth.php`: the log directory exists and is writable, an existing log file is writable, a fallback used in the current request counts as `degraded`; return a `CheckResult` state (`ok|degraded`) without writing
-- [ ] T023 [US4] `install.sh`: create `/var/log/ispconfig-rest` mode 0750 owned by the run user (the existing `$RUN_USER`), write `LOG_PATH=/var/log/ispconfig-rest/ispconfig-rest.log` into the generated `.env`; rotation is the application's 14-day daily rotation (research R5)
+- [x] T021 [US4] Implement `app/Support/Logging/ResilientLogger.php` (a `via` class): Monolog `FallbackGroupHandler` of `RotatingFileHandler(LOG_PATH, 14 days)` then `ErrorLogHandler`, wrapped so any handler exception is swallowed (FR-020); add the channel to `config/logging.php` with `LOG_PATH` defaulting to `storage/logs/ispconfig-rest.log` and make it the default for the application
+- [x] T022 [P] [US4] Implement the log probe `app/Support/Logging/LogHealth.php`: the log directory exists and is writable, an existing log file is writable, a fallback used in the current request counts as `degraded`; return a `CheckResult` state (`ok|degraded`) without writing
+- [x] T023 [US4] `install.sh`: create `/var/log/ispconfig-rest` mode 0750 owned by the run user (the existing `$RUN_USER`), write `LOG_PATH=/var/log/ispconfig-rest/ispconfig-rest.log` into the generated `.env`; rotation is the application's 14-day daily rotation (research R5)
 
 **Checkpoint**: failures leave a trace outside `/usr`, and logging trouble cannot change a response
 
