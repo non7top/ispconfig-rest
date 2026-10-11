@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\IspconfigCompat;
+
 return [
 
     /*
@@ -19,7 +21,7 @@ return [
     | compat_cache_ttl seconds.
     */
 
-    'compat' => \App\Support\IspconfigCompat::load(),
+    'compat' => IspconfigCompat::load(),
 
     'compat_cache_ttl' => (int) env('API_COMPAT_CACHE_TTL', 60),
 

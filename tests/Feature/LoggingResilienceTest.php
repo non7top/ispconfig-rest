@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Support\Logging\LogHealth;
 use App\Support\Logging\ResilientLogger;
 use Illuminate\Support\Facades\Route;
+use Monolog\Logger;
 use Tests\TestCase;
 
 /**
@@ -48,7 +49,7 @@ class LoggingResilienceTest extends TestCase
         return $this->dir.'/blocker/app.log';
     }
 
-    private function logger(string $path): \Monolog\Logger
+    private function logger(string $path): Logger
     {
         return (new ResilientLogger)(['path' => $path, 'days' => 14, 'level' => 'debug']);
     }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Logging\ResilientLogger;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -54,7 +55,7 @@ return [
 
         'resilient' => [
             'driver' => 'custom',
-            'via' => App\Support\Logging\ResilientLogger::class,
+            'via' => ResilientLogger::class,
             'path' => env('LOG_PATH', storage_path('logs/ispconfig-rest.log')),
             'days' => env('LOG_DAILY_DAYS', 14),
             'level' => env('LOG_LEVEL', 'debug'),
