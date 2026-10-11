@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use PDOException;
 
 /**
  * Assembles the contract's ServerStatus projection (spec 009; schema
@@ -127,6 +128,26 @@ class MonitorDataService
         }
 
         return $latest;
+    }
+
+    /**
+     * ISPConfig release string (ISPC_APP_VERSION) from the newest `ispc_info`
+     * row, or null when there is none or it cannot be read (spec 010 R2).
+     */
+    public function ispconfigVersion(): ?string
+    {
+        try {
+            $blob = DB::table('monitor_data')
+                ->where('type', 'ispc_info')
+                ->orderByDesc('created')
+                ->value('data');
+        } catch (PDOException) {
+            return null;
+        }
+
+        $version = $this->decode($blob)['version'] ?? null;
+
+        return is_string($version) && $version !== '' ? $version : null;
     }
 
     /**
