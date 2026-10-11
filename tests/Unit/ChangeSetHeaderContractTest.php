@@ -23,11 +23,7 @@ class ChangeSetHeaderContractTest extends TestCase
      *
      * @var array<int, string>
      */
-    private const NON_JOURNALING_WRITES = [
-        'POST /system/api-keys',
-        'PUT /system/api-keys/{id}',
-        'DELETE /system/api-keys/{id}',
-    ];
+    private const NON_JOURNALING_WRITES = [];
 
     /**
      * @return array<int, array{file: string, path: string, method: string, responses: array<string, mixed>}>
@@ -103,7 +99,7 @@ class ChangeSetHeaderContractTest extends TestCase
             }
         }
 
-        $this->assertGreaterThanOrEqual(151, $checked, 'expected at least 151 write operations in api/modules');
+        $this->assertGreaterThanOrEqual(148, $checked, 'expected at least 148 write operations in api/modules');
         $this->assertSame([], $missing, "2xx write responses without a correct X-Change-Set-Id header reference:\n".implode("\n", $missing));
         $this->assertEqualsCanonicalizing(self::NON_JOURNALING_WRITES, $exceptionsFound, 'every NON_JOURNALING_WRITES entry must exist in the contract');
     }

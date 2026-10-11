@@ -28,8 +28,6 @@ class ChangeSetHeaderTest extends TestCase
         DB::table('server')->insert([
             'server_id' => 1, 'server_name' => 'mail1', 'mail_server' => 1, 'mirror_server_id' => 0, 'active' => 1,
         ]);
-
-        $this->assignServers('clientA', ['mail' => [1]]);
     }
 
     /**
