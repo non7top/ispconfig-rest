@@ -6,6 +6,7 @@ use App\Http\Middleware\RefuseWritesWhenIncompatible;
 use App\Http\Middleware\RequireAdmin;
 use App\Http\Middleware\RequireAdminOrReseller;
 use App\Http\Middleware\RequireClientLimit;
+use App\Support\EnvironmentPath;
 use App\Support\Problem;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,7 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -63,3 +64,5 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
     })->create();
+
+return $app->useEnvironmentPath(EnvironmentPath::resolve($app->basePath()));

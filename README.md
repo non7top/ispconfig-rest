@@ -50,6 +50,24 @@ Every prompt has a flag and `ISPC_REST_*` env var for unattended installs — se
 [nginx vhost](deploy/nginx-vhost.conf.example),
 [php-fpm pool](deploy/php-fpm-pool.conf.example).
 
+### Install from the package
+
+Each release tag (a date, such as `2026.10.11`) is built into a `.deb` with the dependencies included, so the host needs PHP 8.3 or newer and no git or composer. The package creates the `ispconfig-rest` system user, `/etc/ispconfig-rest`, `/var/log/ispconfig-rest` and `/var/cache/ispconfig-rest`, and nothing else: it writes no configuration and runs no migration. Build and check one locally with `scripts/build-deb.sh <version>` and `scripts/test-deb.sh <file>`.
+
+The release workflow signs the apt repository with [apt-cosign](https://github.com/non7top/apt-cosign) (a Sigstore bundle per file, bound to this repository's GitHub Actions identity) and publishes it on the `apt-repo` branch, with the `.deb` and a `SHA256SUMS` file also attached to the GitHub release. With `apt-cosign` installed on the host, the source is:
+
+```
+deb [trusted=yes] sigstore+https://raw.githubusercontent.com/non7top/ispconfig-rest/refs/heads/apt-repo/ ./
+```
+
+For a GitHub-hosted source `apt-cosign` needs no policy: it derives the owner and repository from the URL and accepts only that repository's workflows; pin the workflow with `Enforce::Repo { Pipeline "release.yml"; }` to narrow it (see its README).
+
+Then, as an administrator or a configuration-management state:
+
+1. Write `/etc/ispconfig-rest/.env` (owner `root`, group `ispconfig-rest`, mode `0640`) from [`packaging/deb/env.example`](packaging/deb/env.example), installed as `/usr/share/ispconfig-rest/env.example`, with an `APP_KEY` and the runtime database login.
+2. Run the php-fpm pool and the web server as you do for any install (see [`deploy/`](deploy/)); the pool runs as `ispconfig-rest`.
+3. `ispconfig-rest migrate` (see below), then `ispconfig-rest doctor`. Updates are `apt-get install --only-upgrade ispconfig-rest`; `ispconfig-rest update` refuses on a package install.
+
 ### Managing the installation
 
 ```bash
@@ -59,6 +77,8 @@ ispconfig-rest key:create "my integration"   # mint an admin key
 ispconfig-rest key:create "acme" --client-id 42   # mint a client-scoped key
 ispconfig-rest firewall:allow 8090           # open a port in the ISPConfig firewall
 ispconfig-rest doctor                        # check the database, ISPConfig schema level, migrations and logs
+ispconfig-rest migrate [--check]              # apply the API's pending migrations (idempotent); --check exits 2 when some are pending
+# the privileged login for `migrate` comes from ISPC_REST_DB_ADMIN_USER (default root) and ISPC_REST_DB_ADMIN_PASS (empty with root = unix socket)
 ispconfig-rest restart | logs -f | version | uninstall
 ```
 
@@ -108,6 +128,7 @@ Scoped keys are also bound by their client's **resource limits** (`client.limit_
 - **Status codes**: `200` read/update, `201` create, `204` delete, `400/401/404/409/422` as problem+json.
 - **Probes and status**: `GET /livez` and `GET /readyz` (unauthenticated, per-check states only, `readyz` is `503` when the database, the schema level or the migrations fail; `/up` is the framework's own check) and, for administrator keys, `GET /api/v1/status` with the levels behind it.
 - **Logs**: unhandled failures are logged to `/var/log/ispconfig-rest/` (rotated daily, 14 days), falling back to the PHP error log; a broken log never changes a response.
+- **Configuration file**: `.env` is read from `/etc/ispconfig-rest/` when it has one, otherwise from the install directory (installs from `install.sh` keep it there).
 - **Caches and storage**: nothing is written under the install directory at runtime; the framework caches and storage live in `/var/cache/ispconfig-rest/` (set by `LARAVEL_STORAGE_PATH` and `APP_*_CACHE` in `.env`, created by the installer and `ispconfig-rest update`).
 - **Let's Encrypt outcome**: `GET /api/v1/sites/web-domains/{id}/ssl/status` reports `none`, `requested`, `issued` or `failed` for a website's free certificate. ISPConfig switches Let's Encrypt back off without a journal entry when issuance fails, so the state is derived from the enabling change, its processing status and the current flags. Failure reasons (`domain_not_reachable`, `issuance_failed`, `certificate_not_found`, `client_unavailable`) need the server log level set to Warning or Debug (System → Server Config → Server → Log level); otherwise the reason is `unknown`. Certificate validity is returned only when the API can read `<document_root>/ssl/<domain>-le.crt` (single-server installations).
 - **Async writes**: a successful write confirms the `sys_datalog` journal entry; ISPConfig's daemons apply it within their next cycle (typically ≤ 1 minute). Every write that journaled at least one entry returns an `X-Change-Set-Id` header; any key polls `GET /api/v1/changes/{id}` until the status is `applied`, `failed` or `stalled`, or lists its pending and failed changes with `GET /api/v1/changes?status=pending`. No-change updates, validation failures and writes to API-owned data (API keys) return no header. `/monitor/data-logs` stays the admin view of journal payloads.

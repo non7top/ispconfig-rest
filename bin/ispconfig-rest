@@ -2,13 +2,15 @@
 #
 # ispconfig-rest — manage the ISPConfig REST API installation.
 #
-# Installed to /usr/local/bin/ispconfig-rest by install.sh. Reads
-# /etc/ispconfig-rest/install.conf to locate the deployment.
+# Installed to /usr/local/bin/ispconfig-rest by install.sh (or /usr/bin by the
+# package). Reads /etc/ispconfig-rest/install.conf to locate the deployment; a
+# package install needs no such file.
 #
 #   ispconfig-rest update                 fetch latest, install deps, migrate, restart
 #   ispconfig-rest status                 service state, version, DB connectivity
 #   ispconfig-rest restart|start|stop     control the service
 #   ispconfig-rest logs [-f]              service logs
+#   ispconfig-rest migrate [--check]      apply the API's pending migrations (idempotent; --check exits 2 when some are pending)
 #   ispconfig-rest doctor                 check the database, ISPConfig schema level, migrations and logs
 #   ispconfig-rest key:create NAME [--client-id N]   mint an API key
 #   ispconfig-rest firewall:allow PORT [--proto tcp]  open a port in the ISPConfig firewall
@@ -28,9 +30,15 @@ ok(){   printf '%s\n' "${C_G}✓${C_RESET} $*"; }
 warn(){ printf '%s\n' "${C_Y}!${C_RESET} $*" >&2; }
 die(){  printf '%s\n' "${C_R}✗${C_RESET} $*" >&2; exit 1; }
 
-[ -f "$STATE_FILE" ] || die "Not installed: $STATE_FILE missing. Run install.sh first."
-# shellcheck disable=SC1090
-. "$STATE_FILE"
+PACKAGE_DIR="/usr/share/ispconfig-rest"
+if [ -f "$STATE_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$STATE_FILE"
+elif [ -f "$PACKAGE_DIR/PACKAGED" ]; then
+  INSTALL_DIR="$PACKAGE_DIR"; RUN_USER="ispconfig-rest"
+else
+  die "Not installed: $STATE_FILE missing. Run install.sh first."
+fi
 : "${INSTALL_DIR:?}" "${RUN_USER:?}" "${SERVICE_NAME:=ispconfig-rest}" "${PHP_BIN:=php}"
 
 need_root(){ [ "$(id -u)" = "0" ] || die "This command must run as root (use sudo)."; }
@@ -118,8 +126,15 @@ ensure_runtime_setup() {
   ok "Logs in $LOG_DIR, caches and storage in $CACHE_DIR"
 }
 
+# A package install is updated by the package manager, never by git (spec 060).
+refuse_on_package() {
+  [ -f "$INSTALL_DIR/PACKAGED" ] || return 0
+  die "Installed from the ispconfig-rest package: use apt (apt-get install --only-upgrade ispconfig-rest), not '$1'."
+}
+
 cmd_update() {
   need_root
+  refuse_on_package update
   info "Updating ISPConfig REST API in $INSTALL_DIR"
   # Ensure root can also read the tree cleanly (status/version) going forward.
   git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$INSTALL_DIR" \
@@ -169,12 +184,25 @@ cmd_logs() {
 }
 
 cmd_key_create()    { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:create "$@"; }
+# The privileged login comes from the environment, never from arguments (spec 060).
+cmd_migrate() {
+  need_root
+  shift || true
+  local user="${ISPC_REST_DB_ADMIN_USER:-root}" pass="${ISPC_REST_DB_ADMIN_PASS:-}"
+  if [ "$user" = "root" ] && [ -z "$pass" ]; then
+    # unix-socket auth as MySQL root needs the root OS user; log to stderr and cache in memory so nothing root-owned is left in /var
+    ( cd "$INSTALL_DIR" && DB_USERNAME=root DB_PASSWORD="" LOG_CHANNEL=stderr CACHE_STORE=array "$PHP_BIN" artisan ispconfig:migrate "$@" )
+  else
+    run_as env DB_USERNAME="$user" DB_PASSWORD="$pass" "$PHP_BIN" artisan ispconfig:migrate "$@"
+  fi
+}
 cmd_doctor()       { need_root; run_as "$PHP_BIN" artisan ispconfig:doctor; }
 cmd_firewall_allow(){ need_root; shift || true; run_as "$PHP_BIN" artisan firewall:allow "$@"; }
 cmd_artisan()       { need_root; shift || true; run_as "$PHP_BIN" artisan "$@"; }
 
 cmd_uninstall() {
   need_root
+  refuse_on_package uninstall
   # Web vhost
   case "${SERVE_MODE:-}" in
     apache) a2dissite "$SERVICE_NAME" >/dev/null 2>&1 || true
@@ -206,6 +234,7 @@ case "${1:-}" in
   start|stop|restart)   cmd_service "$1";;
   logs)          shift; cmd_logs "$@";;
   doctor)        cmd_doctor;;
+  migrate)       cmd_migrate "$@";;
   key:create)    cmd_key_create "$@";;
   firewall:allow) cmd_firewall_allow "$@";;
   artisan)       cmd_artisan "$@";;

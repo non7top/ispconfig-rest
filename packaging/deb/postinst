@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+[ "$1" = "configure" ] || exit 0
+
+getent group ispconfig-rest >/dev/null || groupadd --system ispconfig-rest
+getent passwd ispconfig-rest >/dev/null \
+  || useradd --system --gid ispconfig-rest --home-dir /usr/share/ispconfig-rest --no-create-home \
+       --shell /usr/sbin/nologin --comment "ISPConfig REST API" ispconfig-rest
+
+install -d -m 0750 -o root -g ispconfig-rest /etc/ispconfig-rest
+install -d -m 0750 -o ispconfig-rest -g ispconfig-rest \
+  /var/log/ispconfig-rest /var/cache/ispconfig-rest /var/cache/ispconfig-rest/bootstrap \
+  /var/cache/ispconfig-rest/storage /var/cache/ispconfig-rest/storage/app \
+  /var/cache/ispconfig-rest/storage/framework /var/cache/ispconfig-rest/storage/framework/cache \
+  /var/cache/ispconfig-rest/storage/framework/cache/data /var/cache/ispconfig-rest/storage/framework/sessions \
+  /var/cache/ispconfig-rest/storage/framework/views
+
+exit 0

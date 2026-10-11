@@ -1,0 +1,11 @@
+d /etc/ispconfig-rest                                     0750 root ispconfig-rest -
+d /var/log/ispconfig-rest                                 0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest                               0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/bootstrap                     0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/storage                       0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/storage/app                   0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/storage/framework             0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/storage/framework/cache       0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/storage/framework/cache/data  0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/storage/framework/sessions    0750 ispconfig-rest ispconfig-rest -
+d /var/cache/ispconfig-rest/storage/framework/views       0750 ispconfig-rest ispconfig-rest -
