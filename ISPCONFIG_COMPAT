@@ -1,0 +1,9 @@
+# Single source of truth for the ISPConfig versions this API supports.
+# Read by the application, install.sh, `ispconfig-rest doctor` and CI.
+
+# Lowest server.dbversion (the ISPConfig updater's schema level) the code supports.
+min_dbversion=100
+# ISPConfig release that level belongs to.
+min_version=3.3.1p1
+# Release whose schema CI checks the written columns against.
+tested_version=3.3.1p1

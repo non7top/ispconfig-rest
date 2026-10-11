@@ -17,7 +17,7 @@ All unknowns from the Technical Context are resolved below. Facts marked *verifi
 
 ## R3 — Refusing writes before any row is written
 
-- **Decision**: a route middleware alias `compat.writes`, appended to the `api.key` group after authentication, applying to non-safe methods (not GET/HEAD/OPTIONS). It resolves the compatibility report and, when not compatible, throws a typed exception rendered as the 503 problem. It runs before the controller, so no client or other row is created first (FR-008).
+- **Decision**: a route middleware alias `compat.writes`, appended to the `api.key` group after authentication, applying to non-safe methods (not GET/HEAD/OPTIONS). It resolves the compatibility report and, when not compatible, throws a typed exception rendered as the 500 problem. It runs before the controller, so no client or other row is created first (FR-008).
 - **Rationale**: unauthenticated callers still get 401 first and see no schema information. `GET /api/v1/status` is a GET, so it is never refused.
 - **Alternatives rejected**: checking inside `BaseModel::save()` — too late; the s24 orphan clients were created by an earlier model save in the same request.
 

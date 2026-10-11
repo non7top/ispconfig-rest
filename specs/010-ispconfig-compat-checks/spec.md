@@ -14,16 +14,16 @@ On s24 the installed ISPConfig code was 3.3.1p1 but `dbispconfig` had been resto
 
 ### User Story 1 - A schema mismatch is reported, not hidden (Priority: P1)
 
-An integration calls any endpoint against an ISPConfig database whose schema lacks a column or table the API needs. Instead of a bare 500, it receives a `503` problem of type `incompatible-ispconfig-schema` whose `detail` names the missing table and column and says that the ISPConfig database schema is older than the API expects.
+An integration calls any endpoint against an ISPConfig database whose schema lacks a column or table the API needs. Instead of a bare 500, it receives a typed `500` problem of type `incompatible-ispconfig-schema` whose `detail` names the missing table and column and says that the ISPConfig database schema is older than the API expects.
 
 **Why this priority**: This is the failure that actually happened. It is the smallest change that turns a silent, undiagnosable outage into an actionable one, and it is the safety net when every other check is stale or bypassed.
 
-**Independent Test**: Drop a column the API writes (for example `web_domain.disable_symlinknotowner`) from the test database and `POST /api/v1/sites/web-domains`. Expect `503`, `Content-Type: application/problem+json`, `type` ending in `incompatible-ispconfig-schema`, `detail` containing `web_domain` and `disable_symlinknotowner`, and no SQL text, bound value or connection detail anywhere in the body.
+**Independent Test**: Drop a column the API writes (for example `web_domain.disable_symlinknotowner`) from the test database and `POST /api/v1/sites/web-domains`. Expect `500`, `Content-Type: application/problem+json`, `type` ending in `incompatible-ispconfig-schema`, `detail` containing `web_domain` and `disable_symlinknotowner`, and no SQL text, bound value or connection detail anywhere in the body.
 
 **Acceptance Scenarios**:
 
-1. **Given** a missing column (SQLSTATE `42S22`), **When** any request triggers the query, **Then** the response is a 503 problem naming only the table and column.
-2. **Given** a missing table (SQLSTATE `42S02`), **When** any request triggers the query, **Then** the response is a 503 problem naming only the table.
+1. **Given** a missing column (SQLSTATE `42S22`), **When** any request triggers the query, **Then** the response is a 500 problem naming only the table and column.
+2. **Given** a missing table (SQLSTATE `42S02`), **When** any request triggers the query, **Then** the response is a 500 problem naming only the table.
 3. **Given** any other query failure (for example a deadlock or a constraint error), **When** it occurs, **Then** the response stays the generic 500 problem and its detail stays hidden unless `app.debug` is on.
 4. **Given** the problem is returned, **When** the operator reads the log, **Then** the full exception, including the SQL, is in the log and never in the response.
 
@@ -31,15 +31,15 @@ An integration calls any endpoint against an ISPConfig database whose schema lac
 
 ### User Story 2 - An incompatible installation is refused before it writes (Priority: P1)
 
-The API compares the ISPConfig schema level it finds with the minimum it was built for. When the database is older than the minimum, every write request is refused with a 503 problem of type `incompatible-ispconfig-schema` that names both levels, before any row is created. Reads keep working. The installer refuses to install or update below the minimum.
+The API compares the ISPConfig schema level it finds with the minimum it was built for. When the database is older than the minimum, every write request is refused with a 500 problem of type `incompatible-ispconfig-schema` that names both levels, before any row is created. Reads keep working. The installer refuses to install or update below the minimum.
 
 **Why this priority**: Reporting a failure after the first row is written still leaves orphans (the s24 clients). Refusing the whole write up front removes the partial-write hazard.
 
-**Independent Test**: Set the test database's schema level below the declared minimum. `POST /api/v1/clients` returns 503 and creates no `client` row and no `sys_datalog` row. `GET /api/v1/clients` still returns 200. Run the installer against the same database and it exits non-zero before changing anything.
+**Independent Test**: Set the test database's schema level below the declared minimum. `POST /api/v1/clients` returns 500 and creates no `client` row and no `sys_datalog` row. `GET /api/v1/clients` still returns 200. Run the installer against the same database and it exits non-zero before changing anything.
 
 **Acceptance Scenarios**:
 
-1. **Given** schema level 98 and minimum 100, **When** a client sends any POST, PUT or DELETE under `/api/v1`, **Then** the response is 503 with `detail` naming levels 98 and 100, and nothing is written.
+1. **Given** schema level 98 and minimum 100, **When** a client sends any POST, PUT or DELETE under `/api/v1`, **Then** the response is 500 with `detail` naming levels 98 and 100, and nothing is written.
 2. **Given** the same state, **When** a client sends a GET, **Then** it is served normally.
 3. **Given** schema level 104 and minimum 100, **When** writes arrive, **Then** they are served normally.
 4. **Given** the installer or updater runs against a database below the minimum, **When** it checks, **Then** it stops with a message naming both levels and does not install or update.
@@ -106,7 +106,7 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 - **Schema level above anything known.** A level higher than the latest patch the API was built against is compatible; the API only requires a minimum.
 - **No `ispc_info` monitor row yet** (fresh install, monitor cron has not run). The ISPConfig version is reported as unknown and compatibility is decided from the schema level alone.
 - **Version string with a patch suffix** (`3.3.1p1`). Compared with PHP `version_compare`, which ISPConfig itself uses, so `3.3.1p1` is above `3.3.1`.
-- **Stale cache.** After ISPConfig's updater runs, the cached level may be stale for up to the cache lifetime; the 503 refusal and the installer check both re-read when the cached result is a failure.
+- **Stale cache.** After ISPConfig's updater runs, the cached level may be stale for up to the cache lifetime; the 500 refusal and the installer check both re-read when the cached result is a failure.
 - **The check itself cannot run** (database unreachable). Writes fail as they do today; readiness reports `database` failing; the API does not guess that it is compatible.
 - **Missing `server` row or unreadable `dbversion`.** Reported as `unknown`, not as compatible; writes are refused with a problem that says the level could not be determined.
 - **Problem responses leak nothing.** Only table and column names appear; never SQL, bound values, hostnames or credentials.
@@ -123,10 +123,10 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 | GET | `/livez` | Liveness: process is up, no dependencies | none | 200 |
 | GET | `/readyz` | Readiness: database, schema compatibility, API tables; per-check states only | none | 200 / 503 |
 | GET | `/api/v1/status` | Full report: ISPConfig version, schema level, required level, `compatible`, logging state | admin | 200 |
-| any write | `/api/v1/*` | Refused while the schema is below the minimum | existing | 503 problem |
+| any write | `/api/v1/*` | Refused while the schema is below the minimum | existing | 500 problem |
 
 - **Existing routes**: `GET /` (name, version, documentation link) stays unauthenticated and minimal and gains no version or schema data. The framework's `/up` health route stays as it is; `/livez` is its Kubernetes-style alias. `/api/v1/monitor/servers/status` is unrelated: it reports ISPConfig servers, not the API.
-- **Problem type**: `incompatible-ispconfig-schema`, status 503, registered in the problem-type catalogue (`ProblemType`, `docs/problems.md`, spec 023) as its first compatibility entry, with members naming the table and column (reporting) or the found and required levels (refusal).
+- **Problem type**: `incompatible-ispconfig-schema`, status 500, registered in the problem-type catalogue (`ProblemType`, `docs/problems.md`, spec 023) as its first compatibility entry, with members naming the table and column (reporting) or the found and required levels (refusal).
 
 ## ISPConfig Parity & Datalog Impact *(mandatory)*
 
@@ -140,14 +140,14 @@ The required schema level lives in one file, `ISPCONFIG_COMPAT`. A CI check buil
 
 ### Functional Requirements
 
-- **FR-001**: A query failure with SQLSTATE `42S22` or `42S02` MUST produce a 503 `application/problem+json` response of type `incompatible-ispconfig-schema` naming only the table (when it can be determined) and, for `42S22`, the column.
+- **FR-001**: A query failure with SQLSTATE `42S22` or `42S02` MUST produce a 500 `application/problem+json` response of type `incompatible-ispconfig-schema` naming only the table (when it can be determined) and, for `42S22`, the column.
 - **FR-002**: Response bodies MUST NOT contain SQL text, bound values, hostnames or credentials for any failure, regardless of `app.debug` state for these two SQLSTATEs.
 - **FR-003**: All other unhandled failures MUST keep the generic 500 problem, with the cause hidden unless `app.debug` is on.
 - **FR-004**: The required schema level MUST be declared in a single file, `ISPCONFIG_COMPAT`, at the repository root beside `VERSION`, as `key=value` lines `min_dbversion`, `min_version` and `tested_version`, plus an optional `schema_tarball_sha256` pinning the ISPConfig release CI downloads.
 - **FR-005**: The application, the installer, the `doctor` command and CI MUST all read that file; no component may hard-code the minimum.
 - **FR-006**: A missing or malformed `ISPCONFIG_COMPAT` MUST fail each reader loudly with a message naming the file.
 - **FR-007**: The API MUST read the schema level from the `dbversion` of the installation's single `server` row and MAY read the ISPConfig version string from the `ispc_info` monitor row; compatibility MUST be decided by the schema level, with the version string informational.
-- **FR-008**: While the schema level is below `min_dbversion`, every write request under `/api/v1` MUST be refused with a 503 problem of type `incompatible-ispconfig-schema` naming the found and required levels, before any row is written; read requests MUST continue to be served.
+- **FR-008**: While the schema level is below `min_dbversion`, every write request under `/api/v1` MUST be refused with a 500 problem of type `incompatible-ispconfig-schema` naming the found and required levels, before any row is written; read requests MUST continue to be served.
 - **FR-009**: When the level cannot be determined, writes MUST be refused (not assumed compatible) with a problem that says so.
 - **FR-010**: The result of the schema check MUST be cached for a short, configurable time and MUST be re-read when the cached result is a failure.
 - **FR-011**: The installer and updater MUST refuse to proceed, before changing anything, when the database is below `min_dbversion`, naming both levels.
