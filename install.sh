@@ -293,6 +293,12 @@ ENV_FILE="$INSTALL_DIR/.env"
 LOG_DIR="/var/log/ispconfig-rest"
 install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
 ok "Log directory $LOG_DIR"
+# Nothing the app writes at runtime may live under /usr: caches and storage go to /var/cache.
+CACHE_DIR="/var/cache/ispconfig-rest"
+install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
+  "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
+  "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
+ok "Cache directory $CACHE_DIR"
 APP_KEY_LINE="APP_KEY="
 if [ -f "$ENV_FILE" ] && grep -q '^APP_KEY=base64:' "$ENV_FILE"; then
   APP_KEY_LINE="$(grep '^APP_KEY=' "$ENV_FILE")"; info "Preserving existing APP_KEY"
@@ -310,6 +316,13 @@ APP_TIMEZONE=UTC
 LOG_CHANNEL=resilient
 LOG_PATH=$LOG_DIR/ispconfig-rest.log
 LOG_LEVEL=warning
+
+LARAVEL_STORAGE_PATH=$CACHE_DIR/storage
+APP_PACKAGES_CACHE=$CACHE_DIR/bootstrap/packages.php
+APP_SERVICES_CACHE=$CACHE_DIR/bootstrap/services.php
+APP_CONFIG_CACHE=$CACHE_DIR/bootstrap/config.php
+APP_ROUTES_CACHE=$CACHE_DIR/bootstrap/routes.php
+APP_EVENTS_CACHE=$CACHE_DIR/bootstrap/events.php
 
 DB_CONNECTION=mysql
 DB_HOST=$(env_escape "$DB_HOST")
@@ -344,7 +357,7 @@ migrate_privileged() {
   fi
 }
 if migrate_privileged; then MIGRATE_OK=1; else MIGRATE_OK=0; fi
-chown -R "$RUN_USER":"$RUN_USER" "$INSTALL_DIR/storage" "$INSTALL_DIR/bootstrap/cache" 2>/dev/null || true
+chown -R "$RUN_USER":"$RUN_USER" "$INSTALL_DIR/storage" "$INSTALL_DIR/bootstrap/cache" "$CACHE_DIR" 2>/dev/null || true
 if [ "$MIGRATE_OK" = "1" ]; then ok "api_keys table ready"
 else warn "Privileged migration failed. Provide --db-admin-pass (if MySQL root needs a password) or create the table manually, then run 'ispconfig-rest update'."; fi
 

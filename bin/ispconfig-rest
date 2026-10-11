@@ -76,6 +76,7 @@ cmd_status() {
 }
 
 LOG_DIR="/var/log/ispconfig-rest"
+CACHE_DIR="/var/cache/ispconfig-rest"
 
 # Refuse to replace the code when the ISPConfig schema is below the level the
 # incoming version needs ($1 is its ISPCONFIG_COMPAT); the API never applies ISPConfig patches.
@@ -92,15 +93,29 @@ check_ispconfig_schema() {
   ok "ISPConfig schema level $found (requires $min_db)"
 }
 
-# Logs live outside the install tree (under /usr). Installs from before this
-# was introduced have LOG_CHANNEL=stack and no LOG_PATH in .env.
-ensure_log_setup() {
-  local env="$INSTALL_DIR/.env"
-  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
+# Nothing the app writes at runtime may live under /usr: logs, caches and storage
+# go to /var. Installs from before this have LOG_CHANNEL=stack and none of these keys in .env.
+ensure_runtime_setup() {
+  local env="$INSTALL_DIR/.env" key value
+  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
+    "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
+    "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
   [ -f "$env" ] || return 0
   if grep -q '^LOG_CHANNEL=stack$' "$env"; then sed -i 's/^LOG_CHANNEL=stack$/LOG_CHANNEL=resilient/' "$env"; fi
-  grep -q '^LOG_PATH=' "$env" || printf 'LOG_PATH=%s/ispconfig-rest.log\n' "$LOG_DIR" >> "$env"
-  ok "Logs in $LOG_DIR"
+  for key in LOG_PATH LARAVEL_STORAGE_PATH APP_PACKAGES_CACHE APP_SERVICES_CACHE APP_CONFIG_CACHE APP_ROUTES_CACHE APP_EVENTS_CACHE; do
+    grep -q "^$key=" "$env" && continue
+    case "$key" in
+      LOG_PATH) value="$LOG_DIR/ispconfig-rest.log";;
+      LARAVEL_STORAGE_PATH) value="$CACHE_DIR/storage";;
+      APP_PACKAGES_CACHE) value="$CACHE_DIR/bootstrap/packages.php";;
+      APP_SERVICES_CACHE) value="$CACHE_DIR/bootstrap/services.php";;
+      APP_CONFIG_CACHE) value="$CACHE_DIR/bootstrap/config.php";;
+      APP_ROUTES_CACHE) value="$CACHE_DIR/bootstrap/routes.php";;
+      APP_EVENTS_CACHE) value="$CACHE_DIR/bootstrap/events.php";;
+    esac
+    printf '%s=%s\n' "$key" "$value" >> "$env"
+  done
+  ok "Logs in $LOG_DIR, caches and storage in $CACHE_DIR"
 }
 
 cmd_update() {
@@ -124,9 +139,10 @@ cmd_update() {
 
   if [ "$before" = "$after" ]; then ok "Already up to date ($after)"; else info "Updated $before → $after"; fi
 
+  ensure_runtime_setup
+
   local composer="composer"; command -v composer >/dev/null 2>&1 || composer="$PHP_BIN $INSTALL_DIR/composer.phar"
   run_as env COMPOSER_HOME="$INSTALL_DIR/.composer" $composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-  ensure_log_setup
   run_as "$PHP_BIN" artisan migrate --force
   run_as "$PHP_BIN" artisan config:cache >/dev/null 2>&1 || true
   run_as "$PHP_BIN" artisan route:cache  >/dev/null 2>&1 || true
