@@ -59,6 +59,8 @@ ispconfig-rest key:create "my integration"   # mint an admin key
 ispconfig-rest key:create "acme" --client-id 42   # mint a client-scoped key
 ispconfig-rest firewall:allow 8090           # open a port in the ISPConfig firewall
 ispconfig-rest doctor                        # check the database, ISPConfig schema level, migrations and logs
+ispconfig-rest migrate [--check]              # apply the API's pending migrations (idempotent); --check exits 2 when some are pending
+# the privileged login for `migrate` comes from ISPC_REST_DB_ADMIN_USER (default root) and ISPC_REST_DB_ADMIN_PASS (empty with root = unix socket)
 ispconfig-rest restart | logs -f | version | uninstall
 ```
 

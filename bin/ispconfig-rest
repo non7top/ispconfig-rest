@@ -9,6 +9,7 @@
 #   ispconfig-rest status                 service state, version, DB connectivity
 #   ispconfig-rest restart|start|stop     control the service
 #   ispconfig-rest logs [-f]              service logs
+#   ispconfig-rest migrate [--check]      apply the API's pending migrations (idempotent; --check exits 2 when some are pending)
 #   ispconfig-rest doctor                 check the database, ISPConfig schema level, migrations and logs
 #   ispconfig-rest key:create NAME [--client-id N]   mint an API key
 #   ispconfig-rest firewall:allow PORT [--proto tcp]  open a port in the ISPConfig firewall
@@ -169,6 +170,18 @@ cmd_logs() {
 }
 
 cmd_key_create()    { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:create "$@"; }
+# The privileged login comes from the environment, never from arguments (spec 060).
+cmd_migrate() {
+  need_root
+  shift || true
+  local user="${ISPC_REST_DB_ADMIN_USER:-root}" pass="${ISPC_REST_DB_ADMIN_PASS:-}"
+  if [ "$user" = "root" ] && [ -z "$pass" ]; then
+    # unix-socket auth as MySQL root needs the root OS user; log to stderr and cache in memory so nothing root-owned is left in /var
+    ( cd "$INSTALL_DIR" && DB_USERNAME=root DB_PASSWORD="" LOG_CHANNEL=stderr CACHE_STORE=array "$PHP_BIN" artisan ispconfig:migrate "$@" )
+  else
+    run_as env DB_USERNAME="$user" DB_PASSWORD="$pass" "$PHP_BIN" artisan ispconfig:migrate "$@"
+  fi
+}
 cmd_doctor()       { need_root; run_as "$PHP_BIN" artisan ispconfig:doctor; }
 cmd_firewall_allow(){ need_root; shift || true; run_as "$PHP_BIN" artisan firewall:allow "$@"; }
 cmd_artisan()       { need_root; shift || true; run_as "$PHP_BIN" artisan "$@"; }
@@ -206,6 +219,7 @@ case "${1:-}" in
   start|stop|restart)   cmd_service "$1";;
   logs)          shift; cmd_logs "$@";;
   doctor)        cmd_doctor;;
+  migrate)       cmd_migrate "$@";;
   key:create)    cmd_key_create "$@";;
   firewall:allow) cmd_firewall_allow "$@";;
   artisan)       cmd_artisan "$@";;

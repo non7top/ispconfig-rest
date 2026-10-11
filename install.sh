@@ -350,10 +350,10 @@ grep -q '^APP_KEY=base64:' "$ENV_FILE" || { run_as "$PHP_BIN" artisan key:genera
 step "Creating the api_keys table (privileged login)"
 migrate_privileged() {
   if [ -n "$DB_ADMIN_PASS" ] || [ "$DB_ADMIN_USER" != "root" ]; then
-    run_as env DB_USERNAME="$DB_ADMIN_USER" DB_PASSWORD="$DB_ADMIN_PASS" "$PHP_BIN" artisan migrate --force
+    run_as env DB_USERNAME="$DB_ADMIN_USER" DB_PASSWORD="$DB_ADMIN_PASS" "$PHP_BIN" artisan ispconfig:migrate
   else
-    # unix-socket auth as MySQL root — requires the root OS user
-    ( cd "$INSTALL_DIR" && DB_USERNAME=root DB_PASSWORD="" "$PHP_BIN" artisan migrate --force )
+    # unix-socket auth as MySQL root — requires the root OS user; log to stderr and cache in memory so nothing root-owned is left in /var
+    ( cd "$INSTALL_DIR" && DB_USERNAME=root DB_PASSWORD="" LOG_CHANNEL=stderr CACHE_STORE=array "$PHP_BIN" artisan ispconfig:migrate )
   fi
 }
 if migrate_privileged; then MIGRATE_OK=1; else MIGRATE_OK=0; fi
