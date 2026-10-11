@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    'default' => env('LOG_CHANNEL', 'resilient'),
 
     /*
     |--------------------------------------------------------------------------
@@ -51,6 +51,14 @@ return [
     */
 
     'channels' => [
+
+        'resilient' => [
+            'driver' => 'custom',
+            'via' => App\Support\Logging\ResilientLogger::class,
+            'path' => env('LOG_PATH', storage_path('logs/ispconfig-rest.log')),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'level' => env('LOG_LEVEL', 'debug'),
+        ],
 
         'stack' => [
             'driver' => 'stack',
