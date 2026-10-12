@@ -46,6 +46,7 @@ chdir("/usr/share/ispconfig-rest");
 require "vendor/autoload.php";
 \$app = require "bootstrap/app.php";
 \$status = \$app->make(Illuminate\Contracts\Http\Kernel::class)->handle(Illuminate\Http\Request::create("/livez"))->getStatusCode();
+Illuminate\\Support\\Facades\\Log::error("deb-test");
 echo \$status, " ", \$app->environmentPath(), "\n";
 exit(\$status === 200 ? 0 : 1);
 PHP
@@ -55,6 +56,10 @@ out="$(runuser -u ispconfig-rest -- php /tmp/boot.php)" || fail "the application
 echo "ok: boots as ispconfig-rest from /etc/ispconfig-rest/.env ($out)"
 [ -f /var/cache/ispconfig-rest/bootstrap/packages.php ] || fail "the package manifest was not written to /var/cache"
 echo "ok: runtime writes went to /var/cache"
+logfile="$(grep -rl deb-test /var/log/ispconfig-rest || true)"
+[ -n "$logfile" ] || fail "the application did not write its log to /var/log/ispconfig-rest"
+[ "$(stat -c %U "$logfile")" = "ispconfig-rest" ] || fail "$logfile is not owned by ispconfig-rest"
+echo "ok: the log was written to $logfile as ispconfig-rest"
 [ -z "$(find /usr/share/ispconfig-rest -newer /pkg/ispconfig-rest.deb -type f)" ] || fail "something was written into the tree"
 
 # updates belong to the package manager
