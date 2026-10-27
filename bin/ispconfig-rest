@@ -11,6 +11,7 @@
 #   ispconfig-rest status                 service state, version, DB connectivity
 #   ispconfig-rest restart|start|stop     control the service
 #   ispconfig-rest logs [-f]              service logs
+#   ispconfig-rest doctor                 check the database, ISPConfig schema level and migrations
 #   ispconfig-rest key:create NAME [--client-id N] [--acme [--zone Z]...]   mint an API key
 #   ispconfig-rest key:list [--client-id N]     list API keys (never shows secrets)
 #   ispconfig-rest key:revoke ID                  revoke (deactivate) an API key
@@ -482,6 +483,7 @@ cmd_logs() {
 }
 
 cmd_key_create()    { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:create "$@"; }
+cmd_doctor()       { need_root; run_as "$PHP_BIN" artisan ispconfig:doctor; }
 cmd_key_list()      { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:list "$@"; }
 cmd_key_revoke()    { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:revoke "$@"; }
 cmd_firewall_allow(){ need_root; shift || true; run_as "$PHP_BIN" artisan firewall:allow "$@"; }
@@ -522,6 +524,7 @@ case "${1:-}" in
   version|-v|--version) cmd_version;;
   start|stop|restart)   cmd_service "$1";;
   logs)          shift; cmd_logs "$@";;
+  doctor)        cmd_doctor;;
   key:create)    cmd_key_create "$@";;
   key:list)      cmd_key_list "$@";;
   key:revoke)    cmd_key_revoke "$@";;
