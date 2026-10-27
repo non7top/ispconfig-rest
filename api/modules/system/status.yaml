@@ -1,0 +1,23 @@
+# Status — the numbers behind /readyz (administrator keys only).
+/status:
+  get:
+    tags:
+      - System
+    summary: Release and compatibility status
+    description: |
+      Reports the installed API release, whether the ISPConfig schema level is
+      compatible with this API, the level found and required, and the
+      informational ISPConfig release string. Administrator keys only. Never
+      exposes SQL, hostnames or credentials.
+    operationId: getStatus
+    responses:
+      '200':
+        description: Status
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/Status.yaml'
+      '401':
+        $ref: '../../components/responses/Unauthorized.yaml'
+      '403':
+        $ref: '../../components/responses/Forbidden.yaml'

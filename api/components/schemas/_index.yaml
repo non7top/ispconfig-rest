@@ -347,3 +347,12 @@ ProblemLimit:
 
 ForbiddenProblem:
   $ref: './ForbiddenProblem.yaml'
+
+Status:
+  $ref: './Status.yaml'
+
+Readiness:
+  $ref: './Readiness.yaml'
+
+CheckState:
+  $ref: './CheckState.yaml'

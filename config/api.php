@@ -14,6 +14,15 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Installed API release
+    |--------------------------------------------------------------------------
+    | Read from the VERSION file; reported by the administrator status endpoint.
+    */
+
+    'release' => trim((string) @file_get_contents(base_path('VERSION'))) ?: 'unknown',
+
+    /*
+    |--------------------------------------------------------------------------
     | Supported ISPConfig schema level
     |--------------------------------------------------------------------------
     | Parsed from ISPCONFIG_COMPAT; the compatibility result is cached for

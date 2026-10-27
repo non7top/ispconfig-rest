@@ -1,0 +1,4 @@
+type: string
+enum: [ok, failed, unknown]
+description: >-
+  State of one readiness check. `unknown` is a check that could not be evaluated.

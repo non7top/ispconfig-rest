@@ -1,0 +1,17 @@
+type: object
+description: Per-check readiness states. Carries no versions, levels or hostnames.
+required: [status, checks]
+properties:
+  status:
+    type: string
+    enum: [ok, unavailable]
+  checks:
+    type: object
+    required: [database, schema, migrations]
+    properties:
+      database:
+        $ref: './CheckState.yaml'
+      schema:
+        $ref: './CheckState.yaml'
+      migrations:
+        $ref: './CheckState.yaml'
