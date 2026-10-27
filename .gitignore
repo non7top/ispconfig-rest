@@ -21,3 +21,4 @@ Homestead.yaml
 /auth.json
 # Installed extensions (spec 058), separate git checkouts
 /extensions/
+/build
