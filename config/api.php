@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\IspconfigCompat;
+
 return [
 
     /*
@@ -9,6 +11,18 @@ return [
     */
 
     'version' => env('API_VERSION', '1.0'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Supported ISPConfig schema level
+    |--------------------------------------------------------------------------
+    | Parsed from ISPCONFIG_COMPAT; the compatibility result is cached for
+    | compat_cache_ttl seconds.
+    */
+
+    'compat' => IspconfigCompat::load(),
+
+    'compat_cache_ttl' => (int) env('API_COMPAT_CACHE_TTL', 60),
 
     /*
     |--------------------------------------------------------------------------
