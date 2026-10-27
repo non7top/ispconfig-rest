@@ -305,7 +305,8 @@ paths:
       description: >-
         200 only when the database is reachable, the ISPConfig schema level is
         compatible and the API's own migrations are applied. Per-check states
-        only; no versions or levels. Unauthenticated.
+        only; no versions or levels. `logging: degraded` does not fail readiness.
+        Unauthenticated.
       operationId: getReadyz
       security: []
       servers:

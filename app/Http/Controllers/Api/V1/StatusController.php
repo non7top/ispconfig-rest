@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Services\CompatibilityService;
+use App\Support\Logging\LogHealth;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -24,6 +25,7 @@ class StatusController extends Controller
                 'required_dbversion' => $report->requiredDbversion,
                 'minimum_version' => $report->minVersion,
             ],
+            'logging' => ['state' => LogHealth::state()],
         ]);
     }
 }

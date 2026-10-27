@@ -3,12 +3,12 @@
   get:
     tags:
       - System
-    summary: Release and compatibility status
+    summary: Release, compatibility and logging status
     description: |
       Reports the installed API release, whether the ISPConfig schema level is
       compatible with this API, the level found and required, and the
-      informational ISPConfig release string. Administrator keys only. Never
-      exposes SQL, hostnames or credentials.
+      informational ISPConfig release string, and the state of logging.
+      Administrator keys only. Never exposes SQL, hostnames or credentials.
     operationId: getStatus
     responses:
       '200':

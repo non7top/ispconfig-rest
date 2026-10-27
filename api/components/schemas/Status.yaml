@@ -1,6 +1,6 @@
 type: object
-description: API release and ISPConfig compatibility behind the readiness probe (administrator keys only).
-required: [release, compatible, ispconfig]
+description: API release, ISPConfig compatibility and logging state behind the readiness probe (administrator keys only).
+required: [release, compatible, ispconfig, logging]
 properties:
   release:
     type: string
@@ -23,3 +23,9 @@ properties:
         type: integer
       minimum_version:
         type: string
+  logging:
+    type: object
+    required: [state]
+    properties:
+      state:
+        $ref: './CheckState.yaml'

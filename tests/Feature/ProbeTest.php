@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\Logging\LogHealth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -24,11 +25,15 @@ class ProbeTest extends TestCase
 
         $this->dir = sys_get_temp_dir().'/probe-log-'.bin2hex(random_bytes(4));
         mkdir($this->dir);
-        config(['api.compat' => ['min_dbversion' => 100, 'min_version' => '3.3.1p1', 'tested_version' => '3.3.1p1']]);
+        config([
+            'api.compat' => ['min_dbversion' => 100, 'min_version' => '3.3.1p1', 'tested_version' => '3.3.1p1'],
+            'logging.channels.resilient.path' => $this->dir.'/app.log',
+        ]);
         ServerSchema::create();
         MonitorCompletionSchema::create();
         DB::table('server')->insert(['server_id' => 1, 'server_name' => 'secret-host.example', 'dbversion' => 104]);
         Cache::flush();
+        LogHealth::reset();
         $this->enforceCompat();
     }
 
@@ -54,7 +59,7 @@ class ProbeTest extends TestCase
             ->assertOk()
             ->assertExactJson([
                 'status' => 'ok',
-                'checks' => ['database' => 'ok', 'schema' => 'ok', 'migrations' => 'ok'],
+                'checks' => ['database' => 'ok', 'schema' => 'ok', 'migrations' => 'ok', 'logging' => 'ok'],
             ])
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertHeaderMissing('Set-Cookie');
@@ -92,6 +97,19 @@ class ProbeTest extends TestCase
             // RefreshDatabase rolls back on the default connection.
             config(['database.default' => 'sqlite']);
         }
+    }
+
+    public function test_degraded_logging_does_not_fail_readiness(): void
+    {
+        file_put_contents($this->dir.'/blocker', '');
+        config(['logging.channels.resilient.path' => $this->dir.'/blocker/app.log']);
+
+        $this->getJson('/readyz')
+            ->assertOk()
+            ->assertJsonPath('status', 'ok')
+            ->assertJsonPath('checks.logging', 'degraded');
+
+        unlink($this->dir.'/blocker');
     }
 
     public function test_a_pending_migration_is_not_ready(): void

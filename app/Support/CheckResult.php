@@ -12,6 +12,8 @@ final class CheckResult
 
     public const FAILED = 'failed';
 
+    public const DEGRADED = 'degraded';
+
     public const UNKNOWN = 'unknown';
 
     public function __construct(

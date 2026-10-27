@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\CheckResult;
+use App\Support\Logging\LogHealth;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -21,10 +22,10 @@ class HealthCheckService
     /** @return list<CheckResult> */
     public function run(): array
     {
-        return [$this->database(), $this->schema(), $this->migrations()];
+        return [$this->database(), $this->schema(), $this->migrations(), $this->logging()];
     }
 
-    /** Ready unless a check failed. */
+    /** Ready unless a check failed; degraded logging never fails readiness. */
     public function ready(array $results): bool
     {
         foreach ($results as $result) {
@@ -75,5 +76,12 @@ class HealthCheckService
         return $pending === []
             ? new CheckResult('migrations', CheckResult::OK)
             : new CheckResult('migrations', CheckResult::FAILED, count($pending).' pending: '.implode(', ', $pending));
+    }
+
+    private function logging(): CheckResult
+    {
+        return LogHealth::state() === 'ok'
+            ? new CheckResult('logging', CheckResult::OK)
+            : new CheckResult('logging', CheckResult::DEGRADED, dirname((string) config('logging.channels.resilient.path')).' is not writable');
     }
 }

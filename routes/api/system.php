@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 | system/resync action path.
 */
 
-// Release and compatibility status — api/modules/system/status.yaml
+// Release, compatibility and logging status — api/modules/system/status.yaml
 Route::get('status', [StatusController::class, 'show']);
 
 // Global configuration panels — api/modules/system/{sites,mail,dns,domains,misc}-config.yaml
