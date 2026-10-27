@@ -7,6 +7,10 @@ the HTTP API remains under `/api/v1`.
 
 ### Added
 
+- `GET /livez` and `GET /readyz` probes for orchestrators (unauthenticated, per-check states only; `readyz` answers 503
+  while the database is unreachable, the ISPConfig schema level is unsupported or API migrations are pending).
+  `GET /api/v1/status` (administrator keys) reports the installed release, the schema level found and the level
+  required. `ispconfig-rest doctor` runs the same checks from the command line.
 - `ISPCONFIG_COMPAT` declares the lowest ISPConfig schema level (`server.dbversion`) the API supports. Below it, writes
   are refused and reads keep working. A missing table or column, or an unsupported schema level, is reported as a typed
   `incompatible-ispconfig-schema` problem (500) that names only the table and column or the levels, never SQL.
