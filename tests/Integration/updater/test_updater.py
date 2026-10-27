@@ -24,6 +24,7 @@ class UpdaterTests(unittest.TestCase):
         self.checkout = self.base / "checkout"
         self.state = self.base / "install.conf"
         self.calls = self.base / "calls"
+        self.log_dir = self.base / "logs"
         self.env = dict(os.environ, GIT_CONFIG_GLOBAL=str(self.base / "gitconfig"),
                         GIT_CONFIG_NOSYSTEM="1", GIT_TERMINAL_PROMPT="0",
                         GIT_AUTHOR_NAME="Updater test", GIT_AUTHOR_EMAIL="test@example.invalid",
@@ -73,7 +74,10 @@ class UpdaterTests(unittest.TestCase):
         code = code.replace('STATE_FILE="/etc/ispconfig-rest/install.conf"',
                             "STATE_FILE=" + shlex.quote(str(self.state)))
         code = code.replace('CLI_LIB="/usr/local/lib/ispconfig-rest-cli"', "CLI_LIB=" + shlex.quote(str(self.cli_lib)))
+        code = code.replace('LOG_DIR="/var/log/ispconfig-rest"', "LOG_DIR=" + shlex.quote(str(self.log_dir)))
         code += '\nneed_root(){ :; }\nrun_as(){ (cd "$INSTALL_DIR" && "$@"); }\n'
+        # Stand in for `install -d -o USER`, which needs root and the service user.
+        code += 'install(){ mkdir -p "${@: -1}"; }\n'
         code += 'sync_timezone(){ :; }\ncmd_schedule_install(){ :; }\nreload_server(){ :; }\n'
         if mock_helpers:
             code += 'refresh_manager(){ printf "%s\\n" "$RELEASE_REF" >> ' + shlex.quote(str(self.calls)) + '; }\n'
@@ -114,7 +118,7 @@ class UpdaterTests(unittest.TestCase):
         self.run_manager()
         self.assert_branch("develop")
         self.assertEqual(["v1.0.0", "v1.0.1"], self.git(self.checkout, "tag", "--list").splitlines())
-        self.assertEqual("runtime settings\n", (self.checkout / ".env").read_text())
+        self.assertTrue((self.checkout / ".env").read_text().startswith("runtime settings\n"))
         self.assertEqual("{}\n", (self.checkout / ".composer/config.json").read_text())
 
     def test_detached_annotated_tag_stays_pinned_despite_saved_develop(self):
@@ -423,6 +427,28 @@ install(){
     def test_a_release_without_ispconfig_compat_updates_without_reading_the_level(self):
         self.run_manager("--branch", "main", extra="read_schema_level(){ return 1; }\n")
         self.assert_branch("main")
+
+    def test_update_moves_an_old_install_to_the_log_directory(self):
+        (self.checkout / ".env").write_text("LOG_CHANNEL=stack\nLOG_LEVEL=warning\n")
+        self.run_manager()
+        env = (self.checkout / ".env").read_text()
+        self.assertIn("LOG_CHANNEL=resilient\n", env)
+        self.assertIn("LOG_PATH=" + str(self.log_dir) + "/ispconfig-rest.log\n", env)
+        self.assertTrue(self.log_dir.is_dir())
+
+    def test_update_keeps_a_configured_log_path(self):
+        (self.checkout / ".env").write_text("LOG_CHANNEL=resilient\nLOG_PATH=/srv/custom.log\n")
+        self.run_manager()
+        self.assertEqual("LOG_CHANNEL=resilient\nLOG_PATH=/srv/custom.log\n", (self.checkout / ".env").read_text())
+
+    def test_logs_shows_the_newest_rotated_file(self):
+        self.log_dir.mkdir()
+        old, new = self.log_dir / "ispconfig-rest-2026-10-01.log", self.log_dir / "ispconfig-rest-2026-10-02.log"
+        old.write_text("old entry\n")
+        new.write_text("new entry\n")
+        os.utime(old, (1, 1))
+        result = self.run_manager("5", command='cmd_logs "$@"\n')
+        self.assertEqual("new entry\n", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()

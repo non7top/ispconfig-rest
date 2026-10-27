@@ -11,7 +11,7 @@
 #   ispconfig-rest status                 service state, version, DB connectivity
 #   ispconfig-rest restart|start|stop     control the service
 #   ispconfig-rest logs [-f]              service logs
-#   ispconfig-rest doctor                 check the database, ISPConfig schema level and migrations
+#   ispconfig-rest doctor                 check the database, ISPConfig schema level, migrations and logs
 #   ispconfig-rest key:create NAME [--client-id N] [--acme [--zone Z]...]   mint an API key
 #   ispconfig-rest key:list [--client-id N]     list API keys (never shows secrets)
 #   ispconfig-rest key:revoke ID                  revoke (deactivate) an API key
@@ -48,6 +48,7 @@ run_as(){ sudo -u "$RUN_USER" env -C "$INSTALL_DIR" "$@"; }
 CORE_REPOSITORY="https://github.com/FELDSAM-INC/ispconfig-rest.git"
 # Root-owned copies of command-line files, taken from verified published commits only.
 CLI_LIB="/usr/local/lib/ispconfig-rest-cli"
+LOG_DIR="/var/log/ispconfig-rest"
 
 # Fetch REF of REPOSITORY into STAGE/repository and prove that REVISION belongs to it: a public object reachable
 # only through a fork or pull request must not qualify as trusted code.
@@ -187,6 +188,16 @@ valid_update_branch() {
 }
 valid_release_tag() {
   [[ "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] && git check-ref-format "refs/tags/$1" >/dev/null
+}
+
+# Installs from before the log directory existed have LOG_CHANNEL=stack and no LOG_PATH in .env.
+ensure_log_setup() {
+  local env="$INSTALL_DIR/.env"
+  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
+  [ -f "$env" ] || return 0
+  if grep -q '^LOG_CHANNEL=stack$' "$env"; then sed -i 's/^LOG_CHANNEL=stack$/LOG_CHANNEL=resilient/' "$env"; fi
+  grep -q '^LOG_PATH=' "$env" || printf 'LOG_PATH=%s/ispconfig-rest.log\n' "$LOG_DIR" >> "$env"
+  ok "Logs in $LOG_DIR"
 }
 
 # Lowest server.dbversion in the ISPConfig database named by the installation's .env.
@@ -475,6 +486,7 @@ cmd_update() {
 
   local composer="composer"; command -v composer >/dev/null 2>&1 || composer="$PHP_BIN $INSTALL_DIR/composer.phar"
   run_as env COMPOSER_HOME="$INSTALL_DIR/.composer" $composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+  ensure_log_setup
   # Extensions keep their own channel (branch or pinned release).
   local extensions=()
   read -r -a extensions <<< "${EXTENSIONS:-}"
@@ -497,8 +509,9 @@ cmd_service() { # restart (start/stop don't apply — the web server + fpm are s
 }
 
 cmd_logs() {
-  # Prefer the app's own Laravel log; fall back to the Apache vhost error log.
-  local applog="$INSTALL_DIR/storage/logs/laravel.log"
+  # Prefer the app's own log (rotated daily, one file per date); fall back to the Apache vhost error log.
+  local applog; applog="$(ls -1t "$LOG_DIR"/ispconfig-rest-*.log 2>/dev/null | head -n 1 || true)"
+  [ -n "$applog" ] || applog="$INSTALL_DIR/storage/logs/laravel.log"
   local weblog="/var/log/apache2/${SERVICE_NAME}-error.log"
   local log="$applog"; [ -f "$applog" ] || log="$weblog"
   [ -f "$log" ] || die "No log file found ($applog or $weblog)."
