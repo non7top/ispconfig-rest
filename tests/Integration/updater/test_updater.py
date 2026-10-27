@@ -386,5 +386,43 @@ install(){
         self.assertEqual(self.git(origin, "rev-parse", "main"), self.git(self.checkout / "extensions/hosting", "rev-parse", "HEAD"))
         self.assertEqual("update tool\n", (self.cli_lib / "extensions/hosting/tool.py").read_text())
 
+    def require_schema_level(self, min_dbversion):
+        self.git(self.source, "switch", "main")
+        (self.source / "ISPCONFIG_COMPAT").write_text("min_dbversion=%d\nmin_version=3.3.9\n" % min_dbversion)
+        self.commit("Require a newer ISPConfig schema")
+
+    def test_update_is_refused_below_the_incoming_schema_level(self):
+        self.require_schema_level(105)
+        before = self.git(self.checkout, "rev-parse", "HEAD")
+        result = self.run_manager("--branch", "main", extra="read_schema_level(){ echo 104; }\n", check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("level 104 is below the required 105 (ISPConfig 3.3.9)", result.stderr)
+        self.assertEqual(before, self.git(self.checkout, "rev-parse", "HEAD"))
+        self.assertFalse(self.calls.exists() and "composer" in self.calls.read_text())
+
+    def test_update_to_a_release_is_refused_below_the_schema_level(self):
+        self.require_schema_level(105)
+        self.git(self.source, "tag", "-a", "v1.0.2", "-m", "Release")
+        before = self.git(self.checkout, "rev-parse", "HEAD")
+        result = self.run_manager("--tag", "v1.0.2", extra="read_schema_level(){ echo 104; }\n", check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("below the required 105", result.stderr)
+        self.assertEqual(before, self.git(self.checkout, "rev-parse", "HEAD"))
+
+    def test_update_proceeds_at_the_incoming_schema_level(self):
+        self.require_schema_level(105)
+        self.run_manager("--branch", "main", extra="read_schema_level(){ echo 105; }\n")
+        self.assert_branch("main")
+
+    def test_an_unreadable_schema_level_refuses_the_update(self):
+        self.require_schema_level(105)
+        result = self.run_manager("--branch", "main", extra="read_schema_level(){ return 1; }\n", check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Cannot read the ISPConfig schema level", result.stderr)
+
+    def test_a_release_without_ispconfig_compat_updates_without_reading_the_level(self):
+        self.run_manager("--branch", "main", extra="read_schema_level(){ return 1; }\n")
+        self.assert_branch("main")
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,9 @@ the HTTP API remains under `/api/v1`.
 ### Changed
 
 - Dependabot opens weekly, grouped update PRs for Composer packages and GitHub Actions.
+- The installer and `ispconfig-rest update` check the ISPConfig schema level against the incoming version's
+  `ISPCONFIG_COMPAT` before replacing the code, and stop with a message instead of leaving writes refused. Releases
+  without that file are installed as before.
 
 ### Fixed
 
