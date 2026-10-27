@@ -43,9 +43,24 @@ jobs:
         run: |
           cp .env.example .env
           php artisan key:generate
+          mkdir -p build
 
       - name: Run tests
+        env:
+          COMPAT_COLLECT: ${{ github.workspace }}/build/written-columns.json
         run: php artisan test
+
+      - name: Check written columns against the ISPConfig schema
+        if: matrix.php == '8.5'
+        run: |
+          version="$(sed -n 's/^tested_version=//p' ISPCONFIG_COMPAT)"
+          sha="$(sed -n 's/^schema_tarball_sha256=//p' ISPCONFIG_COMPAT)"
+          [ -n "$sha" ] || { echo "ISPCONFIG_COMPAT needs schema_tarball_sha256"; exit 1; }
+          dir="$(mktemp -d)"
+          curl -fsSL -o "$dir/ispconfig.tar.gz" "https://www.ispconfig.org/downloads/ISPConfig-${version}.tar.gz"
+          echo "${sha}  $dir/ispconfig.tar.gz" | sha256sum -c -
+          tar -xzf "$dir/ispconfig.tar.gz" -C "$dir" --wildcards '*/install/sql/*'
+          php scripts/check-compat-schema.php build/written-columns.json "$dir"/*/install/sql
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
