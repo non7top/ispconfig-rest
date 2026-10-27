@@ -124,3 +124,20 @@ and the API never changes permissions to make itself able to read.
 
 No extension members, and no file system path is disclosed. The backup's own `download` object reports this
 as `http: false`, so a consumer can offer the FTP/SSH explanation instead of a download button.
+
+## incompatible-ispconfig-schema
+
+**Status**: 500
+
+The ISPConfig database schema does not match what this API needs: a table or column is missing, or the schema level
+(`server.dbversion`) is below the supported minimum in `ISPCONFIG_COMPAT`. The API cannot tell whether this will clear,
+so it makes no claim of being temporary; run ISPConfig's updater on the server. Never contains SQL, bound values or
+connection details.
+
+Extension members, by case:
+
+| Case | Members |
+|------|---------|
+| A query hit a missing column or table | `table` (when it can be determined), `column` (for a missing column) |
+| Writes refused below the minimum level | `found_dbversion`, `required_dbversion` |
+| The level could not be read | `required_dbversion` |
