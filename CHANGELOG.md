@@ -5,6 +5,10 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+### Changed
+
+- Dependabot opens weekly, grouped update PRs for Composer packages and GitHub Actions.
+
 ## [1.4.0] - 2026-10-17
 
 Domains without hosting can be removed with their services. No migrations. Requires PHP 8.3 or newer and ISPConfig
