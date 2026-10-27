@@ -44,7 +44,7 @@ class StatusEndpointTest extends TestCase
         $this->getJson('/api/v1/status', $this->tenantHeaders('clientA'))->assertStatus(403);
     }
 
-    public function test_an_admin_key_sees_the_release_and_levels(): void
+    public function test_an_admin_key_sees_the_release_levels_and_logging(): void
     {
         $this->getJson('/api/v1/status', $this->tenantHeaders('admin'))
             ->assertOk()
@@ -55,7 +55,8 @@ class StatusEndpointTest extends TestCase
                 'dbversion' => 104,
                 'required_dbversion' => 100,
                 'minimum_version' => '3.3.1p1',
-            ]);
+            ])
+            ->assertJsonStructure(['logging' => ['state']]);
     }
 
     public function test_an_incompatible_schema_is_reported_not_refused(): void
