@@ -285,10 +285,15 @@ prepare_privileged_extensions() (
   done
 )
 
+# Root runs this from the staged copy with the runtime .env, so it must not leave root-owned files in the
+# runtime log or cache directories: log to stderr, cache in memory, and hand the cache directory back.
 migrate_privileged() (
   cd "$PRIVILEGED_STAGE/app"
-  DB_USERNAME="$DB_ADMIN_USER" DB_PASSWORD="$DB_ADMIN_PASS" \
-    API_EXTENSIONS_PATH="$PRIVILEGED_STAGE/app/extensions" "$PHP_BIN" artisan migrate --force
+  status=0
+  DB_USERNAME="$DB_ADMIN_USER" DB_PASSWORD="$DB_ADMIN_PASS" LOG_CHANNEL=stderr CACHE_STORE=array \
+    API_EXTENSIONS_PATH="$PRIVILEGED_STAGE/app/extensions" "$PHP_BIN" artisan migrate --force || status=$?
+  chown -R "$RUN_USER":"$RUN_USER" "$CACHE_DIR" 2>/dev/null || true
+  exit "$status"
 )
 
 # ---------------------------------------------------------------------------
@@ -472,6 +477,12 @@ ENV_FILE="$INSTALL_DIR/.env"
 LOG_DIR="/var/log/ispconfig-rest"
 install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
 ok "Log directory $LOG_DIR"
+# Nothing the app writes at runtime has to live in the install tree: caches and storage go to /var/cache.
+CACHE_DIR="/var/cache/ispconfig-rest"
+install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
+  "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
+  "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
+ok "Cache directory $CACHE_DIR"
 APP_KEY_LINE="$(run_as "$PHP_BIN" -r '
   $env = @file_get_contents(".env");
   if (is_string($env) && preg_match("/^APP_KEY=(base64:[A-Za-z0-9+\/=]{44})$/m", $env, $match)
@@ -494,6 +505,13 @@ APP_TIMEZONE=$(env_escape "$TIMEZONE")
 LOG_CHANNEL=resilient
 LOG_PATH=$LOG_DIR/ispconfig-rest.log
 LOG_LEVEL=warning
+
+LARAVEL_STORAGE_PATH=$CACHE_DIR/storage
+APP_PACKAGES_CACHE=$CACHE_DIR/bootstrap/packages.php
+APP_SERVICES_CACHE=$CACHE_DIR/bootstrap/services.php
+APP_CONFIG_CACHE=$CACHE_DIR/bootstrap/config.php
+APP_ROUTES_CACHE=$CACHE_DIR/bootstrap/routes.php
+APP_EVENTS_CACHE=$CACHE_DIR/bootstrap/events.php
 
 DB_CONNECTION=mysql
 DB_HOST=$(env_escape "$DB_HOST")
