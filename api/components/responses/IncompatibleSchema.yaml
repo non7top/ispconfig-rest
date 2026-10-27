@@ -1,0 +1,38 @@
+description: >-
+  The ISPConfig database schema does not match what this API needs: a required
+  table or column is missing, or the schema level is below the supported minimum
+  (RFC 9457 problem details, type `incompatible-ispconfig-schema`).
+content:
+  application/problem+json:
+    schema:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          description: The catalogue URL ending in `#incompatible-ispconfig-schema`
+          pattern: '#incompatible-ispconfig-schema$'
+        title:
+          type: string
+        status:
+          type: integer
+          enum: [500]
+        detail:
+          type: string
+        table:
+          type: string
+          description: Present when determinable
+        column:
+          type: string
+          description: Present for a missing column
+        found_dbversion:
+          type: integer
+        required_dbversion:
+          type: integer
+    example:
+      type: 'https://github.com/FELDSAM-INC/ispconfig-rest/blob/main/docs/problems.md#incompatible-ispconfig-schema'
+      title: Incompatible ISPConfig schema
+      status: 500
+      detail: 'The ISPConfig database schema is older than this API expects: table web_domain is missing column disable_symlinknotowner. Run ISPConfig''s updater.'
+      table: web_domain
+      column: disable_symlinknotowner

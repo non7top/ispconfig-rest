@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\ApiKeyAuth;
 use App\Http\Middleware\AttachChangeSetId;
+use App\Http\Middleware\RefuseWritesWhenIncompatible;
 use App\Http\Middleware\RequireAdmin;
 use App\Http\Middleware\RequireAdminOrReseller;
 use App\Http\Middleware\RequireBackupAccess;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'api.key' => ApiKeyAuth::class,
             'change.set' => AttachChangeSetId::class,
+            'compat.writes' => RefuseWritesWhenIncompatible::class,
             'scope.admin' => RequireAdmin::class,
             'scope.reseller' => RequireAdminOrReseller::class,
             'scope.limit' => RequireClientLimit::class,
@@ -40,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // with 403 before any binding query runs.
         $middleware->priority([
             ApiKeyAuth::class,
+            RefuseWritesWhenIncompatible::class,
             AttachChangeSetId::class,
             RequireAdmin::class,
             RequireAdminOrReseller::class,

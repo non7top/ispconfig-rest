@@ -10,8 +10,9 @@ use Illuminate\Support\Facades\Route;
 | (constitution Principle IV): specific routes before general ones.
 */
 
-// change.set adds X-Change-Set-Id to successful journaling writes (spec 015).
-Route::middleware(['api.key', 'change.set'])->group(function () {
+// change.set adds X-Change-Set-Id to successful journaling writes (spec 015);
+// compat.writes refuses writes below the supported ISPConfig schema (spec 010).
+Route::middleware(['api.key', 'compat.writes', 'change.set'])->group(function () {
     Route::get('/ping', fn () => response()->json([
         'data' => ['pong' => true],
     ]));
