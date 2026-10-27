@@ -24,6 +24,8 @@ class UpdaterTests(unittest.TestCase):
         self.checkout = self.base / "checkout"
         self.state = self.base / "install.conf"
         self.calls = self.base / "calls"
+        self.log_dir = self.base / "logs"
+        self.cache_dir = self.base / "cache"
         self.env = dict(os.environ, GIT_CONFIG_GLOBAL=str(self.base / "gitconfig"),
                         GIT_CONFIG_NOSYSTEM="1", GIT_TERMINAL_PROMPT="0",
                         GIT_AUTHOR_NAME="Updater test", GIT_AUTHOR_EMAIL="test@example.invalid",
@@ -73,7 +75,11 @@ class UpdaterTests(unittest.TestCase):
         code = code.replace('STATE_FILE="/etc/ispconfig-rest/install.conf"',
                             "STATE_FILE=" + shlex.quote(str(self.state)))
         code = code.replace('CLI_LIB="/usr/local/lib/ispconfig-rest-cli"', "CLI_LIB=" + shlex.quote(str(self.cli_lib)))
+        code = code.replace('LOG_DIR="/var/log/ispconfig-rest"', "LOG_DIR=" + shlex.quote(str(self.log_dir)))
+        code = code.replace('CACHE_DIR="/var/cache/ispconfig-rest"', "CACHE_DIR=" + shlex.quote(str(self.cache_dir)))
         code += '\nneed_root(){ :; }\nrun_as(){ (cd "$INSTALL_DIR" && "$@"); }\n'
+        # Stand in for `install -d -o USER`, which needs root and the service user.
+        code += 'install(){ while [ $# -gt 0 ]; do case "$1" in -d) ;; -m|-o|-g) shift;; *) mkdir -p "$1";; esac; shift; done; }\n'
         code += 'sync_timezone(){ :; }\ncmd_schedule_install(){ :; }\nreload_server(){ :; }\n'
         if mock_helpers:
             code += 'refresh_manager(){ printf "%s\\n" "$RELEASE_REF" >> ' + shlex.quote(str(self.calls)) + '; }\n'
@@ -114,7 +120,7 @@ class UpdaterTests(unittest.TestCase):
         self.run_manager()
         self.assert_branch("develop")
         self.assertEqual(["v1.0.0", "v1.0.1"], self.git(self.checkout, "tag", "--list").splitlines())
-        self.assertEqual("runtime settings\n", (self.checkout / ".env").read_text())
+        self.assertTrue((self.checkout / ".env").read_text().startswith("runtime settings\n"))
         self.assertEqual("{}\n", (self.checkout / ".composer/config.json").read_text())
 
     def test_detached_annotated_tag_stays_pinned_despite_saved_develop(self):
@@ -385,6 +391,79 @@ install(){
         self.run_manager(extra=self.FAKE_GIT + 'refresh_manager(){ :; }\n', mock_helpers=False)
         self.assertEqual(self.git(origin, "rev-parse", "main"), self.git(self.checkout / "extensions/hosting", "rev-parse", "HEAD"))
         self.assertEqual("update tool\n", (self.cli_lib / "extensions/hosting/tool.py").read_text())
+
+    def require_schema_level(self, min_dbversion):
+        self.git(self.source, "switch", "main")
+        (self.source / "ISPCONFIG_COMPAT").write_text("min_dbversion=%d\nmin_version=3.3.9\n" % min_dbversion)
+        self.commit("Require a newer ISPConfig schema")
+
+    def test_update_is_refused_below_the_incoming_schema_level(self):
+        self.require_schema_level(105)
+        before = self.git(self.checkout, "rev-parse", "HEAD")
+        result = self.run_manager("--branch", "main", extra="read_schema_level(){ echo 104; }\n", check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("level 104 is below the required 105 (ISPConfig 3.3.9)", result.stderr)
+        self.assertEqual(before, self.git(self.checkout, "rev-parse", "HEAD"))
+        self.assertFalse(self.calls.exists() and "composer" in self.calls.read_text())
+
+    def test_update_to_a_release_is_refused_below_the_schema_level(self):
+        self.require_schema_level(105)
+        self.git(self.source, "tag", "-a", "v1.0.2", "-m", "Release")
+        before = self.git(self.checkout, "rev-parse", "HEAD")
+        result = self.run_manager("--tag", "v1.0.2", extra="read_schema_level(){ echo 104; }\n", check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("below the required 105", result.stderr)
+        self.assertEqual(before, self.git(self.checkout, "rev-parse", "HEAD"))
+
+    def test_update_proceeds_at_the_incoming_schema_level(self):
+        self.require_schema_level(105)
+        self.run_manager("--branch", "main", extra="read_schema_level(){ echo 105; }\n")
+        self.assert_branch("main")
+
+    def test_an_unreadable_schema_level_refuses_the_update(self):
+        self.require_schema_level(105)
+        result = self.run_manager("--branch", "main", extra="read_schema_level(){ return 1; }\n", check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Cannot read the ISPConfig schema level", result.stderr)
+
+    def test_a_release_without_ispconfig_compat_updates_without_reading_the_level(self):
+        self.run_manager("--branch", "main", extra="read_schema_level(){ return 1; }\n")
+        self.assert_branch("main")
+
+    def test_update_moves_an_old_install_to_the_log_directory(self):
+        (self.checkout / ".env").write_text("LOG_CHANNEL=stack\nLOG_LEVEL=warning\n")
+        self.run_manager()
+        env = (self.checkout / ".env").read_text()
+        self.assertIn("LOG_CHANNEL=resilient\n", env)
+        self.assertIn("LOG_PATH=" + str(self.log_dir) + "/ispconfig-rest.log\n", env)
+        self.assertTrue(self.log_dir.is_dir())
+
+    def test_update_keeps_a_configured_log_path(self):
+        (self.checkout / ".env").write_text("LOG_CHANNEL=resilient\nLOG_PATH=/srv/custom.log\n")
+        self.run_manager()
+        env = (self.checkout / ".env").read_text()
+        self.assertIn("LOG_PATH=/srv/custom.log\n", env)
+        self.assertNotIn("ispconfig-rest.log", env)
+
+    def test_logs_shows_the_newest_rotated_file(self):
+        self.log_dir.mkdir()
+        old, new = self.log_dir / "ispconfig-rest-2026-10-01.log", self.log_dir / "ispconfig-rest-2026-10-02.log"
+        old.write_text("old entry\n")
+        new.write_text("new entry\n")
+        os.utime(old, (1, 1))
+        result = self.run_manager("5", command='cmd_logs "$@"\n')
+        self.assertEqual("new entry\n", result.stdout)
+
+    def test_update_points_caches_and_storage_outside_the_install_directory(self):
+        (self.checkout / ".env").write_text("APP_CONFIG_CACHE=/srv/config.php\n")
+        self.run_manager()
+        env = (self.checkout / ".env").read_text()
+        self.assertIn("LARAVEL_STORAGE_PATH=" + str(self.cache_dir) + "/storage\n", env)
+        self.assertIn("APP_ROUTES_CACHE=" + str(self.cache_dir) + "/bootstrap/routes.php\n", env)
+        self.assertIn("APP_CONFIG_CACHE=/srv/config.php\n", env)
+        self.assertEqual(1, env.count("APP_CONFIG_CACHE="))
+        for directory in ("bootstrap", "storage/app", "storage/framework/views"):
+            self.assertTrue((self.cache_dir / directory).is_dir(), directory)
 
 if __name__ == "__main__":
     unittest.main()

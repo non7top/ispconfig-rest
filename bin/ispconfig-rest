@@ -11,7 +11,7 @@
 #   ispconfig-rest status                 service state, version, DB connectivity
 #   ispconfig-rest restart|start|stop     control the service
 #   ispconfig-rest logs [-f]              service logs
-#   ispconfig-rest doctor                 check the database, ISPConfig schema level and migrations
+#   ispconfig-rest doctor                 check the database, ISPConfig schema level, migrations and logs
 #   ispconfig-rest key:create NAME [--client-id N] [--acme [--zone Z]...]   mint an API key
 #   ispconfig-rest key:list [--client-id N]     list API keys (never shows secrets)
 #   ispconfig-rest key:revoke ID                  revoke (deactivate) an API key
@@ -48,6 +48,8 @@ run_as(){ sudo -u "$RUN_USER" env -C "$INSTALL_DIR" "$@"; }
 CORE_REPOSITORY="https://github.com/FELDSAM-INC/ispconfig-rest.git"
 # Root-owned copies of command-line files, taken from verified published commits only.
 CLI_LIB="/usr/local/lib/ispconfig-rest-cli"
+LOG_DIR="/var/log/ispconfig-rest"
+CACHE_DIR="/var/cache/ispconfig-rest"
 
 # Fetch REF of REPOSITORY into STAGE/repository and prove that REVISION belongs to it: a public object reachable
 # only through a fork or pull request must not qualify as trusted code.
@@ -189,6 +191,52 @@ valid_release_tag() {
   [[ "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] && git check-ref-format "refs/tags/$1" >/dev/null
 }
 
+# Logs, caches and storage go to /var, so nothing is written under the install tree at runtime. Installs
+# from before this have LOG_CHANNEL=stack and none of these keys in .env.
+ensure_runtime_setup() {
+  local env="$INSTALL_DIR/.env" key value
+  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
+    "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
+    "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
+  [ -f "$env" ] || return 0
+  if grep -q '^LOG_CHANNEL=stack$' "$env"; then sed -i 's/^LOG_CHANNEL=stack$/LOG_CHANNEL=resilient/' "$env"; fi
+  for key in LOG_PATH LARAVEL_STORAGE_PATH APP_PACKAGES_CACHE APP_SERVICES_CACHE APP_CONFIG_CACHE APP_ROUTES_CACHE APP_EVENTS_CACHE; do
+    grep -q "^$key=" "$env" && continue
+    case "$key" in
+      LOG_PATH) value="$LOG_DIR/ispconfig-rest.log";;
+      LARAVEL_STORAGE_PATH) value="$CACHE_DIR/storage";;
+      APP_PACKAGES_CACHE) value="$CACHE_DIR/bootstrap/packages.php";;
+      APP_SERVICES_CACHE) value="$CACHE_DIR/bootstrap/services.php";;
+      APP_CONFIG_CACHE) value="$CACHE_DIR/bootstrap/config.php";;
+      APP_ROUTES_CACHE) value="$CACHE_DIR/bootstrap/routes.php";;
+      APP_EVENTS_CACHE) value="$CACHE_DIR/bootstrap/events.php";;
+    esac
+    printf '%s=%s\n' "$key" "$value" >> "$env"
+  done
+  ok "Logs in $LOG_DIR, caches and storage in $CACHE_DIR"
+}
+
+# Lowest server.dbversion in the ISPConfig database named by the installation's .env.
+read_schema_level() {
+  run_as "$PHP_BIN" -r 'require "vendor/autoload.php"; $e=Dotenv\Dotenv::createArrayBacked(getcwd())->load(); $p=new PDO("mysql:host=$e[DB_HOST];port=$e[DB_PORT];dbname=$e[DB_DATABASE]",$e["DB_USERNAME"],$e["DB_PASSWORD"],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]); echo $p->query("SELECT MIN(dbversion) FROM server")->fetchColumn();' 2>/dev/null
+}
+
+# Refuse to replace the code when the ISPConfig schema is below the level the incoming
+# version needs ($1 is its ref); the API never applies ISPConfig patches. Releases
+# without ISPCONFIG_COMPAT predate the check.
+check_incoming_schema() {
+  local compat min_db min_ver found
+  compat="$(run_as git show "$1:ISPCONFIG_COMPAT" 2>/dev/null)" || return 0
+  min_db="$(printf '%s\n' "$compat" | sed -n 's/^min_dbversion=//p')"
+  min_ver="$(printf '%s\n' "$compat" | sed -n 's/^min_version=//p')"
+  case "$min_db" in ''|*[!0-9]*) die "ISPCONFIG_COMPAT has no valid min_dbversion; nothing was changed.";; esac
+  found="$(read_schema_level)" || die "Cannot read the ISPConfig schema level (server.dbversion); nothing was changed."
+  case "$found" in ''|*[!0-9]*) die "The ISPConfig schema level could not be determined; nothing was changed.";; esac
+  [ "$found" -ge "$min_db" ] \
+    || die "ISPConfig schema level $found is below the required $min_db (ISPConfig $min_ver). Run ISPConfig's updater first; nothing was changed."
+  ok "ISPConfig schema level $found (requires $min_db)"
+}
+
 # Switch the checkout in DIR (relative to the installation) to BRANCH or release TAG; with neither, keep its
 # current branch or pinned release. Sets SELECTED_REF (refs/heads/… or refs/tags/…) and SELECTED_NAME.
 checkout_channel() { # DIR BRANCH TAG
@@ -216,6 +264,7 @@ checkout_channel() { # DIR BRANCH TAG
       run_as git -C "$dir" merge-base --is-ancestor "refs/heads/$branch" "$target" \
         || die "Branch $branch has diverged from origin. Resolve local commits before updating."
     fi
+    [ "$dir" != . ] || check_incoming_schema "$target"
     run_as git -C "$dir" checkout -B "$branch" "$target"
     SELECTED_REF="refs/heads/$branch"
     SELECTED_NAME="$branch"
@@ -230,6 +279,7 @@ checkout_channel() { # DIR BRANCH TAG
     run_as git -C "$dir" ls-remote --exit-code --refs origin "$target" >/dev/null \
       || die "Release $tag was not found on origin."
     info "Update channel: release $tag (pinned; use --branch main to follow stable updates)"
+    [ "$dir" != . ] || check_incoming_schema "$target"
     run_as git -C "$dir" checkout --detach "$target"
     SELECTED_REF="$target"
     SELECTED_NAME="$tag"
@@ -452,6 +502,7 @@ cmd_update() {
 
   local composer="composer"; command -v composer >/dev/null 2>&1 || composer="$PHP_BIN $INSTALL_DIR/composer.phar"
   run_as env COMPOSER_HOME="$INSTALL_DIR/.composer" $composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+  ensure_runtime_setup
   # Extensions keep their own channel (branch or pinned release).
   local extensions=()
   read -r -a extensions <<< "${EXTENSIONS:-}"
@@ -474,8 +525,9 @@ cmd_service() { # restart (start/stop don't apply — the web server + fpm are s
 }
 
 cmd_logs() {
-  # Prefer the app's own Laravel log; fall back to the Apache vhost error log.
-  local applog="$INSTALL_DIR/storage/logs/laravel.log"
+  # Prefer the app's own log (rotated daily, one file per date); fall back to the Apache vhost error log.
+  local applog; applog="$(ls -1t "$LOG_DIR"/ispconfig-rest-*.log 2>/dev/null | head -n 1 || true)"
+  [ -n "$applog" ] || applog="$INSTALL_DIR/storage/logs/laravel.log"
   local weblog="/var/log/apache2/${SERVICE_NAME}-error.log"
   local log="$applog"; [ -f "$applog" ] || log="$weblog"
   [ -f "$log" ] || die "No log file found ($applog or $weblog)."

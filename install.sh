@@ -260,6 +260,21 @@ else ok "Using existing user $RUN_USER"; fi
 # Fetch code + dependencies
 # ---------------------------------------------------------------------------
 step "Fetching application code"
+# Refuse an ISPConfig database below the schema level the code supports
+# (ISPCONFIG_COMPAT, passed in as $1): the API never applies ISPConfig patches.
+check_ispconfig_schema() {
+  local min_db min_ver found
+  min_db="$(printf '%s\n' "$1" | sed -n 's/^min_dbversion=//p')"
+  min_ver="$(printf '%s\n' "$1" | sed -n 's/^min_version=//p')"
+  case "$min_db" in ''|*[!0-9]*) die "ISPCONFIG_COMPAT has no valid min_dbversion";; esac
+  found="$(ISPC_DSN="mysql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME" ISPC_USER="$DB_USER" ISPC_PASS="$DB_PASS" \
+    "$PHP_BIN" -r '$p=new PDO(getenv("ISPC_DSN"),getenv("ISPC_USER"),getenv("ISPC_PASS"),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]); echo $p->query("SELECT MIN(dbversion) FROM server")->fetchColumn();' 2>/dev/null)" \
+    || die "Cannot read the ISPConfig schema level (server.dbversion) from $DB_NAME"
+  case "$found" in ''|*[!0-9]*) die "The ISPConfig schema level in $DB_NAME could not be determined";; esac
+  [ "$found" -ge "$min_db" ] \
+    || die "ISPConfig schema level $found is below the required $min_db (ISPConfig $min_ver). Run ISPConfig's updater first."
+  ok "ISPConfig schema level $found (requires $min_db)"
+}
 # Trust the tree system-wide: it is owned by $RUN_USER, but root (installer,
 # `ispconfig-rest status`) also runs git against it. Without this, git aborts
 # with "detected dubious ownership".
@@ -269,14 +284,23 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   # A shallow clone knows only its own branch: fetch the selected branch or release tag by its full ref.
   if git -C "$INSTALL_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
     git -C "$INSTALL_DIR" fetch --depth 1 origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
-    git -C "$INSTALL_DIR" checkout -f -B "$BRANCH" "origin/$BRANCH"
+    NEW_REF="origin/$BRANCH"
   else
     git -C "$INSTALL_DIR" fetch --depth 1 origin "+refs/tags/$BRANCH:refs/tags/$BRANCH"
-    git -C "$INSTALL_DIR" checkout -f --detach "refs/tags/$BRANCH"
+    NEW_REF="refs/tags/$BRANCH"
+  fi
+  # Checked before the tree is replaced, so a refused update leaves the running version untouched.
+  # Releases without ISPCONFIG_COMPAT predate the check.
+  if COMPAT="$(git -C "$INSTALL_DIR" show "$NEW_REF:ISPCONFIG_COMPAT" 2>/dev/null)"; then check_ispconfig_schema "$COMPAT"; fi
+  if [ "$NEW_REF" = "origin/$BRANCH" ]; then
+    git -C "$INSTALL_DIR" checkout -f -B "$BRANCH" "$NEW_REF"
+  else
+    git -C "$INSTALL_DIR" checkout -f --detach "$NEW_REF"
   fi
 else
   mkdir -p "$(dirname "$INSTALL_DIR")"
   git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  if [ -f "$INSTALL_DIR/ISPCONFIG_COMPAT" ]; then check_ispconfig_schema "$(cat "$INSTALL_DIR/ISPCONFIG_COMPAT")"; fi
 fi
 chown -R "$RUN_USER":"$RUN_USER" "$INSTALL_DIR"
 ok "Code at $INSTALL_DIR ($(git -C "$INSTALL_DIR" rev-parse --short HEAD))"
@@ -319,6 +343,16 @@ info "API timezone: $TIMEZONE ($TIMEZONE_MODE)"
 
 step "Configuring environment"
 ENV_FILE="$INSTALL_DIR/.env"
+# Logs live outside the install tree; the app rotates them itself.
+LOG_DIR="/var/log/ispconfig-rest"
+install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
+ok "Log directory $LOG_DIR"
+# Nothing the app writes at runtime has to live in the install tree: caches and storage go to /var/cache.
+CACHE_DIR="/var/cache/ispconfig-rest"
+install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
+  "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
+  "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
+ok "Cache directory $CACHE_DIR"
 APP_KEY_LINE="APP_KEY="
 if [ -f "$ENV_FILE" ] && grep -q '^APP_KEY=base64:' "$ENV_FILE"; then
   APP_KEY_LINE="$(grep '^APP_KEY=' "$ENV_FILE")"; info "Preserving existing APP_KEY"
@@ -333,8 +367,16 @@ APP_DEBUG=false
 APP_URL=$(env_escape "$APP_URL")
 APP_TIMEZONE=$(env_escape "$TIMEZONE")
 
-LOG_CHANNEL=stack
+LOG_CHANNEL=resilient
+LOG_PATH=$LOG_DIR/ispconfig-rest.log
 LOG_LEVEL=warning
+
+LARAVEL_STORAGE_PATH=$CACHE_DIR/storage
+APP_PACKAGES_CACHE=$CACHE_DIR/bootstrap/packages.php
+APP_SERVICES_CACHE=$CACHE_DIR/bootstrap/services.php
+APP_CONFIG_CACHE=$CACHE_DIR/bootstrap/config.php
+APP_ROUTES_CACHE=$CACHE_DIR/bootstrap/routes.php
+APP_EVENTS_CACHE=$CACHE_DIR/bootstrap/events.php
 
 DB_CONNECTION=mysql
 DB_HOST=$(env_escape "$DB_HOST")
@@ -370,7 +412,7 @@ migrate_privileged() {
   fi
 }
 if migrate_privileged; then MIGRATE_OK=1; else MIGRATE_OK=0; fi
-chown -R "$RUN_USER":"$RUN_USER" "$INSTALL_DIR/storage" "$INSTALL_DIR/bootstrap/cache" 2>/dev/null || true
+chown -R "$RUN_USER":"$RUN_USER" "$INSTALL_DIR/storage" "$INSTALL_DIR/bootstrap/cache" "$CACHE_DIR" 2>/dev/null || true
 if [ "$MIGRATE_OK" = "1" ]; then ok "API-owned tables ready"
 else warn "Privileged migration failed. Provide --db-admin-pass (if MySQL root needs a password) or create the table manually, then run 'ispconfig-rest update'."; fi
 

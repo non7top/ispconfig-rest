@@ -7,11 +7,13 @@ properties:
     enum: [ok, unavailable]
   checks:
     type: object
-    required: [database, schema, migrations]
+    required: [database, schema, migrations, logging]
     properties:
       database:
         $ref: './CheckState.yaml'
       schema:
         $ref: './CheckState.yaml'
       migrations:
+        $ref: './CheckState.yaml'
+      logging:
         $ref: './CheckState.yaml'

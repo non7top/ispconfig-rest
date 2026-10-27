@@ -17,7 +17,17 @@ the HTTP API remains under `/api/v1`.
 
 ### Changed
 
+- Unhandled failures are logged to `/var/log/ispconfig-rest/` (rotated daily, 14 days) with the PHP error log as a
+  fallback, and a broken log never changes a response. The installer creates the directory and `ispconfig-rest update`
+  moves an existing install to it. `GET /readyz`, `GET /api/v1/status` and `ispconfig-rest doctor` report the log
+  state (`degraded` does not fail readiness). `ispconfig-rest logs` reads the new location.
+- The framework caches and storage live in `/var/cache/ispconfig-rest/` instead of the install directory, so nothing is
+  written there at runtime. The installer creates the directory and `ispconfig-rest update` adds the `.env` keys to an
+  existing install.
 - Dependabot opens weekly, grouped update PRs for Composer packages and GitHub Actions.
+- The installer and `ispconfig-rest update` check the ISPConfig schema level against the incoming version's
+  `ISPCONFIG_COMPAT` before replacing the code, and stop with a message instead of leaving writes refused. Releases
+  without that file are installed as before.
 
 ### Fixed
 
