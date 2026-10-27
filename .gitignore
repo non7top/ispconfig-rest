@@ -25,3 +25,4 @@ Homestead.yaml
 # Security scanner output can contain vulnerability details.
 /security-reports/
 /.codex-security/
+/build
