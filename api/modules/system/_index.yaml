@@ -39,3 +39,7 @@ resync:
 # API keys (API-owned api_keys table, spec 014)
 api-keys:
   $ref: './api-keys.yaml'
+
+# Status and compatibility
+status:
+  $ref: './status.yaml'
