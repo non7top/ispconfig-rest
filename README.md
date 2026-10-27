@@ -14,7 +14,7 @@ See the [changelog](CHANGELOG.md) for release notes and upgrade requirements.
 
 - PHP ≥ 8.3
 - Composer
-- Network access to an ISPConfig 3.3 MySQL database (`dbispconfig`) — reverse-engineered against 3.3.0p1, validated live against 3.3.1p1. The supported schema level (`server.dbversion`) and release are declared in [`ISPCONFIG_COMPAT`](ISPCONFIG_COMPAT); while the database is below it, writes are refused (reads keep working). Run ISPConfig's updater to fix it.
+- Network access to an ISPConfig 3.3 MySQL database (`dbispconfig`) — reverse-engineered against 3.3.0p1, validated live against 3.3.1p1. The supported schema level (`server.dbversion`) and release are declared in [`ISPCONFIG_COMPAT`](ISPCONFIG_COMPAT); while the database is below it, writes are refused (reads keep working). The installer and `ispconfig-rest update` refuse to install a version whose declared level the database does not meet, before anything is replaced. Run ISPConfig's updater to fix it.
 
 ## Extensions
 
