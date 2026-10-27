@@ -49,6 +49,7 @@ CORE_REPOSITORY="https://github.com/FELDSAM-INC/ispconfig-rest.git"
 # Root-owned copies of command-line files, taken from verified published commits only.
 CLI_LIB="/usr/local/lib/ispconfig-rest-cli"
 LOG_DIR="/var/log/ispconfig-rest"
+CACHE_DIR="/var/cache/ispconfig-rest"
 
 # Fetch REF of REPOSITORY into STAGE/repository and prove that REVISION belongs to it: a public object reachable
 # only through a fork or pull request must not qualify as trusted code.
@@ -190,14 +191,29 @@ valid_release_tag() {
   [[ "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] && git check-ref-format "refs/tags/$1" >/dev/null
 }
 
-# Installs from before the log directory existed have LOG_CHANNEL=stack and no LOG_PATH in .env.
-ensure_log_setup() {
-  local env="$INSTALL_DIR/.env"
-  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
+# Logs, caches and storage go to /var, so nothing is written under the install tree at runtime. Installs
+# from before this have LOG_CHANNEL=stack and none of these keys in .env.
+ensure_runtime_setup() {
+  local env="$INSTALL_DIR/.env" key value
+  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
+    "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
+    "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
   [ -f "$env" ] || return 0
   if grep -q '^LOG_CHANNEL=stack$' "$env"; then sed -i 's/^LOG_CHANNEL=stack$/LOG_CHANNEL=resilient/' "$env"; fi
-  grep -q '^LOG_PATH=' "$env" || printf 'LOG_PATH=%s/ispconfig-rest.log\n' "$LOG_DIR" >> "$env"
-  ok "Logs in $LOG_DIR"
+  for key in LOG_PATH LARAVEL_STORAGE_PATH APP_PACKAGES_CACHE APP_SERVICES_CACHE APP_CONFIG_CACHE APP_ROUTES_CACHE APP_EVENTS_CACHE; do
+    grep -q "^$key=" "$env" && continue
+    case "$key" in
+      LOG_PATH) value="$LOG_DIR/ispconfig-rest.log";;
+      LARAVEL_STORAGE_PATH) value="$CACHE_DIR/storage";;
+      APP_PACKAGES_CACHE) value="$CACHE_DIR/bootstrap/packages.php";;
+      APP_SERVICES_CACHE) value="$CACHE_DIR/bootstrap/services.php";;
+      APP_CONFIG_CACHE) value="$CACHE_DIR/bootstrap/config.php";;
+      APP_ROUTES_CACHE) value="$CACHE_DIR/bootstrap/routes.php";;
+      APP_EVENTS_CACHE) value="$CACHE_DIR/bootstrap/events.php";;
+    esac
+    printf '%s=%s\n' "$key" "$value" >> "$env"
+  done
+  ok "Logs in $LOG_DIR, caches and storage in $CACHE_DIR"
 }
 
 # Lowest server.dbversion in the ISPConfig database named by the installation's .env.
@@ -486,7 +502,7 @@ cmd_update() {
 
   local composer="composer"; command -v composer >/dev/null 2>&1 || composer="$PHP_BIN $INSTALL_DIR/composer.phar"
   run_as env COMPOSER_HOME="$INSTALL_DIR/.composer" $composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-  ensure_log_setup
+  ensure_runtime_setup
   # Extensions keep their own channel (branch or pinned release).
   local extensions=()
   read -r -a extensions <<< "${EXTENSIONS:-}"

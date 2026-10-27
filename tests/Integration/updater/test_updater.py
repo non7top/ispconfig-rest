@@ -25,6 +25,7 @@ class UpdaterTests(unittest.TestCase):
         self.state = self.base / "install.conf"
         self.calls = self.base / "calls"
         self.log_dir = self.base / "logs"
+        self.cache_dir = self.base / "cache"
         self.env = dict(os.environ, GIT_CONFIG_GLOBAL=str(self.base / "gitconfig"),
                         GIT_CONFIG_NOSYSTEM="1", GIT_TERMINAL_PROMPT="0",
                         GIT_AUTHOR_NAME="Updater test", GIT_AUTHOR_EMAIL="test@example.invalid",
@@ -75,9 +76,10 @@ class UpdaterTests(unittest.TestCase):
                             "STATE_FILE=" + shlex.quote(str(self.state)))
         code = code.replace('CLI_LIB="/usr/local/lib/ispconfig-rest-cli"', "CLI_LIB=" + shlex.quote(str(self.cli_lib)))
         code = code.replace('LOG_DIR="/var/log/ispconfig-rest"', "LOG_DIR=" + shlex.quote(str(self.log_dir)))
+        code = code.replace('CACHE_DIR="/var/cache/ispconfig-rest"', "CACHE_DIR=" + shlex.quote(str(self.cache_dir)))
         code += '\nneed_root(){ :; }\nrun_as(){ (cd "$INSTALL_DIR" && "$@"); }\n'
         # Stand in for `install -d -o USER`, which needs root and the service user.
-        code += 'install(){ mkdir -p "${@: -1}"; }\n'
+        code += 'install(){ while [ $# -gt 0 ]; do case "$1" in -d) ;; -m|-o|-g) shift;; *) mkdir -p "$1";; esac; shift; done; }\n'
         code += 'sync_timezone(){ :; }\ncmd_schedule_install(){ :; }\nreload_server(){ :; }\n'
         if mock_helpers:
             code += 'refresh_manager(){ printf "%s\\n" "$RELEASE_REF" >> ' + shlex.quote(str(self.calls)) + '; }\n'
@@ -439,7 +441,9 @@ install(){
     def test_update_keeps_a_configured_log_path(self):
         (self.checkout / ".env").write_text("LOG_CHANNEL=resilient\nLOG_PATH=/srv/custom.log\n")
         self.run_manager()
-        self.assertEqual("LOG_CHANNEL=resilient\nLOG_PATH=/srv/custom.log\n", (self.checkout / ".env").read_text())
+        env = (self.checkout / ".env").read_text()
+        self.assertIn("LOG_PATH=/srv/custom.log\n", env)
+        self.assertNotIn("ispconfig-rest.log", env)
 
     def test_logs_shows_the_newest_rotated_file(self):
         self.log_dir.mkdir()
@@ -449,6 +453,17 @@ install(){
         os.utime(old, (1, 1))
         result = self.run_manager("5", command='cmd_logs "$@"\n')
         self.assertEqual("new entry\n", result.stdout)
+
+    def test_update_points_caches_and_storage_outside_the_install_directory(self):
+        (self.checkout / ".env").write_text("APP_CONFIG_CACHE=/srv/config.php\n")
+        self.run_manager()
+        env = (self.checkout / ".env").read_text()
+        self.assertIn("LARAVEL_STORAGE_PATH=" + str(self.cache_dir) + "/storage\n", env)
+        self.assertIn("APP_ROUTES_CACHE=" + str(self.cache_dir) + "/bootstrap/routes.php\n", env)
+        self.assertIn("APP_CONFIG_CACHE=/srv/config.php\n", env)
+        self.assertEqual(1, env.count("APP_CONFIG_CACHE="))
+        for directory in ("bootstrap", "storage/app", "storage/framework/views"):
+            self.assertTrue((self.cache_dir / directory).is_dir(), directory)
 
 if __name__ == "__main__":
     unittest.main()
