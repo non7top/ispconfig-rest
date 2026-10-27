@@ -19,3 +19,5 @@ InternalServerError:
 
 UnprocessableEntity:
   $ref: './UnprocessableEntity.yaml'
+IncompatibleSchema:
+  $ref: './IncompatibleSchema.yaml'

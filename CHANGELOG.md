@@ -5,6 +5,12 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+### Added
+
+- `ISPCONFIG_COMPAT` declares the lowest ISPConfig schema level (`server.dbversion`) the API supports. Below it, writes
+  are refused and reads keep working. A missing table or column, or an unsupported schema level, is reported as a typed
+  `incompatible-ispconfig-schema` problem (500) that names only the table and column or the levels, never SQL.
+
 ### Changed
 
 - Dependabot opens weekly, grouped update PRs for Composer packages and GitHub Actions.

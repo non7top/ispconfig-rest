@@ -29,6 +29,8 @@ final class ProblemType
 
     public const DOWNLOAD_NOT_READABLE = 'download-not-readable';
 
+    public const INCOMPATIBLE_SCHEMA = 'incompatible-ispconfig-schema';
+
     /** Every documented name, in docs/problems.md order. */
     public const NAMES = [
         self::ACCOUNT_LOCKED,
@@ -40,6 +42,7 @@ final class ProblemType
         self::RESOURCE_IN_USE,
         self::DOWNLOAD_NOT_PREPARED,
         self::DOWNLOAD_NOT_READABLE,
+        self::INCOMPATIBLE_SCHEMA,
     ];
 
     public static function uri(string $name): string
