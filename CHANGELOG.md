@@ -5,6 +5,34 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+### Added
+
+- `ISPCONFIG_COMPAT` declares the lowest ISPConfig schema level (`server.dbversion`) the API supports. Below it, writes
+  are refused and reads keep working. A missing table or column, or an unsupported schema level, is reported as a typed
+  `incompatible-ispconfig-schema` problem (500) that names only the table and column or the levels, never SQL.
+- `GET /livez` and `GET /readyz` probes for orchestrators (unauthenticated, per-check states only; `readyz` answers 503
+  while the database is unreachable, the ISPConfig schema level is unsupported or API migrations are pending).
+  `GET /api/v1/status` (administrator keys) reports the installed release, the schema level found and the level
+  required. `ispconfig-rest doctor` runs the same checks from the command line.
+- CI checks the columns the test suite writes against the ISPConfig schema named by `ISPCONFIG_COMPAT`.
+
+### Changed
+
+- The installer and `ispconfig-rest update` check the ISPConfig schema level against the incoming version's
+  `ISPCONFIG_COMPAT` before replacing the code, and stop with a message instead of leaving writes refused. Releases
+  without that file are installed as before.
+- Unhandled failures are logged to `/var/log/ispconfig-rest/` (rotated daily, 14 days) with the PHP error log as a
+  fallback, and a broken log never changes a response. The installer creates the directory and `ispconfig-rest update`
+  moves an existing install to it. `GET /readyz`, `GET /api/v1/status` and `ispconfig-rest doctor` report the log
+  state (`degraded` does not fail readiness). `ispconfig-rest logs` reads the new location.
+- The framework caches and storage live in `/var/cache/ispconfig-rest/` instead of the install directory, so nothing is
+  written there at runtime. The installer creates the directory and `ispconfig-rest update` adds the `.env` keys to an
+  existing install.
+
+### Fixed
+
+- The installer preflight also checks for the PHP `phar` extension, which Composer needs.
+
 ## [1.5.0] - 2026-11-14
 
 ### Added
