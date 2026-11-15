@@ -80,8 +80,10 @@ class HealthCheckService
 
     private function logging(): CheckResult
     {
-        return LogHealth::state() === 'ok'
+        $problem = LogHealth::problem();
+
+        return $problem === null
             ? new CheckResult('logging', CheckResult::OK)
-            : new CheckResult('logging', CheckResult::DEGRADED, dirname((string) config('logging.channels.resilient.path')).' is not writable');
+            : new CheckResult('logging', CheckResult::DEGRADED, $problem);
     }
 }

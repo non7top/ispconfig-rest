@@ -110,6 +110,44 @@ class LoggingResilienceTest extends TestCase
         $this->assertSame('degraded', LogHealth::state());
     }
 
+    public function test_an_unwritable_log_of_an_earlier_day_does_not_degrade_logging(): void
+    {
+        $this->skipWhenRoot();
+        config(['logging.channels.resilient.path' => $this->dir.'/app.log']);
+        $stale = $this->dir.'/app-2020-01-01.log';
+        file_put_contents($stale, 'left by an old install');
+        chmod($stale, 0400);
+
+        $this->assertSame('ok', LogHealth::state());
+        $this->assertNull(LogHealth::problem());
+    }
+
+    public function test_an_unwritable_log_for_today_degrades_logging_and_names_the_file(): void
+    {
+        $this->skipWhenRoot();
+        config(['logging.channels.resilient.path' => $this->dir.'/app.log']);
+        $today = $this->dir.'/app-'.date('Y-m-d').'.log';
+        file_put_contents($today, 'x');
+        chmod($today, 0400);
+
+        $this->assertSame('degraded', LogHealth::state());
+        $this->assertSame($today.' is not writable', LogHealth::problem());
+    }
+
+    public function test_the_problem_names_an_unwritable_directory(): void
+    {
+        config(['logging.channels.resilient.path' => $this->brokenPath()]);
+
+        $this->assertSame(dirname($this->brokenPath()).' is not writable', LogHealth::problem());
+    }
+
+    private function skipWhenRoot(): void
+    {
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            $this->markTestSkipped('root can write any file');
+        }
+    }
+
     public function test_a_fallback_marks_logging_degraded(): void
     {
         config(['logging.channels.resilient.path' => $this->dir.'/app.log']);
