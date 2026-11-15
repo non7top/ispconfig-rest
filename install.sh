@@ -184,6 +184,13 @@ detect_fpm() {
 
 # Fetch and verify Composer only inside a private directory; never execute a
 # pre-existing file from a shared temporary path. Subshell cleanup covers errors.
+# Only the Composer this installer fetches needs phar in PHP_BIN; one already on PATH runs however its owner set it up
+# (a node may drop the extension from php.ini and load it only for Composer).
+require_phar_for_composer() {
+  "$PHP_BIN" -m | grep -qix phar \
+    || die "Composer is not installed and this PHP has no phar extension, which Composer needs. Install Composer or enable phar."
+}
+
 install_composer() (
   set -euo pipefail
   local destination="$1" stage
@@ -314,7 +321,7 @@ PHP_VER="$("$PHP_BIN" -r 'echo PHP_VERSION;')"
 ok "PHP $PHP_VER"
 
 MISSING_EXT=""
-for ext in pdo_mysql mbstring openssl tokenizer xml ctype json bcmath fileinfo phar; do
+for ext in pdo_mysql mbstring openssl tokenizer xml ctype json bcmath fileinfo; do
   "$PHP_BIN" -m | grep -qix "$ext" || MISSING_EXT="$MISSING_EXT $ext"
 done
 [ -z "$MISSING_EXT" ] || die "Missing PHP extensions:$MISSING_EXT"
@@ -325,6 +332,7 @@ ok "Required PHP extensions present"
 
 if command -v composer >/dev/null 2>&1; then COMPOSER="composer"
 else
+  require_phar_for_composer
   info "Composer not found — fetching and verifying a local copy"
   install_composer /usr/local/bin/composer
   COMPOSER="composer"

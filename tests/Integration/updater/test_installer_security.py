@@ -291,6 +291,21 @@ read_conf(){ case "$1" in host) echo db-host;; port) echo 3307;; database) echo 
             self.assertTrue(path.startswith(str(self.stage / 'app')), path)
             self.assertFalse(path.startswith(str(runtime_cache)), path)
 
+    def test_phar_is_required_only_when_the_installer_has_to_fetch_composer(self):
+        php = self.root / 'php-no-phar'
+        php.write_text('#!/bin/sh\n[ "$1" = -m ] && printf "Core\\nctype\\nmbstring\\n"\n')
+        php.chmod(0o755)
+        self.environment['PHP_BIN'] = str(php)
+        script = 'die(){ echo "$*" >&2; exit 1; }\n' + installer_function('require_phar_for_composer')
+        refused = self.run_script(script + 'require_phar_for_composer')
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('no phar extension', refused.stderr)
+        # A PHP that does load phar passes.
+        php.write_text('#!/bin/sh\n[ "$1" = -m ] && printf "Core\\nPhar\\n"\n')
+        self.assertEqual(self.run_script(script + 'require_phar_for_composer').returncode, 0)
+        # The preflight extension list does not include phar, so an existing Composer on a PHP without it is accepted.
+        self.assertNotRegex(INSTALLER, r'for ext in [^;]*\bphar\b')
+
     def test_failed_private_migration_does_not_fall_back_to_runtime(self):
         (self.runtime / 'artisan').write_text('<?php file_put_contents(getenv("MARKER"), "unsafe");')
         result = self.run_script(installer_function('migrate_privileged', True) + 'migrate_privileged')
