@@ -5,6 +5,11 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+## [1.5.0-fork.1] - 2026-11-15
+
+Upstream 1.5.0 with the compatibility checks, probes, logging and runtime-path changes below. Fork pre-release for
+the fleet; not an upstream release.
+
 ### Added
 
 - `ISPCONFIG_COMPAT` declares the lowest ISPConfig schema level (`server.dbversion`) the API supports. Below it, writes
