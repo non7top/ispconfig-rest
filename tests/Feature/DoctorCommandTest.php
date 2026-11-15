@@ -71,4 +71,35 @@ class DoctorCommandTest extends TestCase
             ->expectsOutputToContain('degraded')
             ->assertSuccessful();
     }
+
+    public function test_the_log_option_proves_an_entry_reaches_todays_file(): void
+    {
+        config(['logging.default' => 'resilient', 'logging.channels.resilient.level' => 'debug']);
+
+        $this->artisan('ispconfig:doctor', ['--log' => true])
+            ->expectsOutputToContain('log write')
+            ->assertSuccessful();
+
+        $file = $this->dir.'/app-'.date('Y-m-d').'.log';
+        $this->assertStringContainsString('ispconfig:doctor log write test', (string) file_get_contents($file));
+    }
+
+    public function test_the_log_option_fails_when_the_entry_cannot_be_written(): void
+    {
+        file_put_contents($this->dir.'/blocker', '');
+        config([
+            'logging.default' => 'resilient',
+            'logging.channels.resilient.level' => 'debug',
+            'logging.channels.resilient.path' => $this->dir.'/blocker/app.log',
+        ]);
+        $original = ini_set('error_log', $this->dir.'/php-error.log');
+
+        try {
+            $this->artisan('ispconfig:doctor', ['--log' => true])
+                ->expectsOutputToContain('did not reach')
+                ->assertFailed();
+        } finally {
+            ini_set('error_log', (string) $original);
+        }
+    }
 }
