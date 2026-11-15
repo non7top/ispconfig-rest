@@ -581,6 +581,19 @@ install(){
         self.assertIn("LOG_PATH=/srv/custom.log\n", env)
         self.assertNotIn("ispconfig-rest.log", env)
 
+    def test_update_hands_existing_logs_to_the_run_user(self):
+        self.log_dir.mkdir()
+        old = self.log_dir / "ispconfig-rest-2026-10-20.log"
+        old.write_text("left by an older install\n")
+        (self.log_dir / "other.txt").write_text("not a log\n")
+        chown = self.bin / "chown"
+        chown.write_text("#!/bin/sh\nprintf 'chown %s\\n' \"$*\" >> " + shlex.quote(str(self.calls)) + "\n")
+        chown.chmod(0o755)
+        self.run_manager()
+        calls = self.calls.read_text()
+        self.assertIn("chown -h fixture:fixture " + str(old), calls)
+        self.assertNotIn("other.txt", calls)
+
     def test_logs_shows_the_newest_rotated_file(self):
         self.log_dir.mkdir()
         old, new = self.log_dir / "ispconfig-rest-2026-10-01.log", self.log_dir / "ispconfig-rest-2026-10-02.log"
