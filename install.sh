@@ -285,16 +285,20 @@ prepare_privileged_extensions() (
   done
 )
 
-# Root runs this from the staged copy with the runtime .env, so it logs to stderr and caches in memory
-# instead of writing root-owned files into the runtime log and cache directories.
+# Root runs this from the staged copy, whose .env points the framework caches at the runtime cache directory.
+# Redirect them into the stage: a cached config there would still hold the runtime login instead of the
+# privileged one, and root must not leave files in the runtime log and cache directories.
 migrate_privileged() (
   cd "$PRIVILEGED_STAGE/app"
   DB_USERNAME="$DB_ADMIN_USER" DB_PASSWORD="$DB_ADMIN_PASS" LOG_CHANNEL=stderr CACHE_STORE=array \
+    LARAVEL_STORAGE_PATH="$PRIVILEGED_STAGE/app/storage" \
+    APP_PACKAGES_CACHE="$PRIVILEGED_STAGE/app/bootstrap/cache/packages.php" \
+    APP_SERVICES_CACHE="$PRIVILEGED_STAGE/app/bootstrap/cache/services.php" \
+    APP_CONFIG_CACHE="$PRIVILEGED_STAGE/app/bootstrap/cache/config.php" \
+    APP_ROUTES_CACHE="$PRIVILEGED_STAGE/app/bootstrap/cache/routes.php" \
+    APP_EVENTS_CACHE="$PRIVILEGED_STAGE/app/bootstrap/cache/events.php" \
     API_EXTENSIONS_PATH="$PRIVILEGED_STAGE/app/extensions" "$PHP_BIN" artisan migrate --force
 )
-
-# Artisan can still write its package manifest into the cache directory when it boots as root.
-restore_cache_owner() { chown -R -h "$RUN_USER":"$RUN_USER" "$CACHE_DIR" 2>/dev/null || true; }
 
 # ---------------------------------------------------------------------------
 # Preflight
@@ -540,7 +544,6 @@ write_runtime_env < "$PRIVILEGED_STAGE/app/.env"
 # ---------------------------------------------------------------------------
 step "Creating API-owned tables (privileged login)"
 if migrate_privileged; then MIGRATE_OK=1; else MIGRATE_OK=0; fi
-restore_cache_owner
 if [ "$MIGRATE_OK" = "1" ]; then ok "API-owned tables ready"
 else warn "Privileged migration failed. Provide --db-admin-pass-file (if MySQL root needs a password) or create the table manually, then run 'ispconfig-rest update'."; fi
 
@@ -841,7 +844,6 @@ if [ ${#EXTENSIONS[@]} -gt 0 ]; then
   prepare_privileged_extensions
   if migrate_privileged; then ok "Extension tables ready"
   else warn "Privileged migration failed; run 'ispconfig-rest extension:update' once the database login is fixed."; fi
-  restore_cache_owner
   run_as "$PHP_BIN" artisan config:cache >/dev/null 2>&1 || true
   run_as "$PHP_BIN" artisan route:cache  >/dev/null 2>&1 || true
   "$MANAGER_PATH" restart >/dev/null 2>&1 || true

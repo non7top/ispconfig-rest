@@ -274,6 +274,23 @@ read_conf(){ case "$1" in host) echo db-host;; port) echo 3307;; database) echo 
                 str(self.stage / 'app'), user, password, str(self.stage / 'app' / 'extensions'),
                 ['artisan', 'migrate', '--force']])
 
+    def test_privileged_migration_ignores_the_runtime_cached_config(self):
+        (self.stage / 'app' / 'artisan').write_text(
+            '<?php file_put_contents(getenv("MARKER"), json_encode(['
+            'getenv("APP_CONFIG_CACHE"), getenv("APP_ROUTES_CACHE"), getenv("APP_PACKAGES_CACHE"), '
+            'getenv("APP_SERVICES_CACHE"), getenv("APP_EVENTS_CACHE"), getenv("LARAVEL_STORAGE_PATH")]));')
+        runtime_cache = self.root / 'var-cache'
+        self.environment.update(APP_CONFIG_CACHE=str(runtime_cache / 'config.php'),
+                                LARAVEL_STORAGE_PATH=str(runtime_cache / 'storage'))
+        result = self.run_script(installer_function('migrate_privileged', True) + 'migrate_privileged')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        import json
+        seen = json.loads((self.root / 'marker').read_text())
+        self.assertEqual(len(seen), 6)
+        for path in seen:
+            self.assertTrue(path.startswith(str(self.stage / 'app')), path)
+            self.assertFalse(path.startswith(str(runtime_cache)), path)
+
     def test_failed_private_migration_does_not_fall_back_to_runtime(self):
         (self.runtime / 'artisan').write_text('<?php file_put_contents(getenv("MARKER"), "unsafe");')
         result = self.run_script(installer_function('migrate_privileged', True) + 'migrate_privileged')
