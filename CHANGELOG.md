@@ -5,6 +5,11 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+## [1.5.0-fork.2] - 2026-11-15
+
+Same application code as 1.5.0-fork.1. The security workflow's HTTP fixture now carries a compatible ISPConfig schema level, so
+its tenant-isolation write check passes and the release job can run. Use this tag instead of 1.5.0-fork.1.
+
 ## [1.5.0-fork.1] - 2026-11-15
 
 Upstream 1.5.0 with the compatibility checks, probes, logging and runtime-path changes below. Fork pre-release for
