@@ -5,6 +5,20 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+## [1.5.0-fork.4] - 2026-11-15
+
+### Added
+
+- `ispconfig-rest doctor --log` writes a warning through the application log and confirms it reached today's log file.
+
+### Fixed
+
+- The log check no longer reports `degraded` because of an unwritable log file from an earlier day (for example one an
+  older install's root-run command left behind); only the directory and today's file count. The check now names the
+  real cause instead of always saying the directory is not writable.
+- The installer and `ispconfig-rest update` hand existing `ispconfig-rest*.log` files in the log directory to the run
+  user.
+
 ## [1.5.0-fork.3] - 2026-11-15
 
 ### Fixed
