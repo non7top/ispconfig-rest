@@ -344,16 +344,21 @@ valid_release_tag() {
 }
 
 # Logs, caches and storage go to /var, so nothing is written under the install tree at runtime. Installs
-# from before this have LOG_CHANNEL=stack and none of these keys in .env.
+# from before this have LOG_CHANNEL=stack and none of these keys in .env. Root only creates the two top-level
+# directories; everything below them and the .env edits run as the run user, which owns those trees and could
+# otherwise plant a link for root to follow.
 ensure_runtime_setup() {
-  local env="$INSTALL_DIR/.env" key value
-  install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
-    "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
-    "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
-  [ -f "$env" ] || return 0
-  if grep -q '^LOG_CHANNEL=stack$' "$env"; then sed -i 's/^LOG_CHANNEL=stack$/LOG_CHANNEL=resilient/' "$env"; fi
+  local key value dir
+  for dir in "$LOG_DIR" "$CACHE_DIR"; do
+    [ ! -L "$dir" ] || die "$dir must not be a symlink."
+    install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$dir"
+  done
+  run_as mkdir -p "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework/cache/data" \
+    "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
+  run_as test -f .env || return 0
+  if run_as grep -q '^LOG_CHANNEL=stack$' .env; then run_as sed -i 's/^LOG_CHANNEL=stack$/LOG_CHANNEL=resilient/' .env; fi
   for key in LOG_PATH LARAVEL_STORAGE_PATH APP_PACKAGES_CACHE APP_SERVICES_CACHE APP_CONFIG_CACHE APP_ROUTES_CACHE APP_EVENTS_CACHE; do
-    grep -q "^$key=" "$env" && continue
+    run_as grep -q "^$key=" .env && continue
     case "$key" in
       LOG_PATH) value="$LOG_DIR/ispconfig-rest.log";;
       LARAVEL_STORAGE_PATH) value="$CACHE_DIR/storage";;
@@ -363,7 +368,7 @@ ensure_runtime_setup() {
       APP_ROUTES_CACHE) value="$CACHE_DIR/bootstrap/routes.php";;
       APP_EVENTS_CACHE) value="$CACHE_DIR/bootstrap/events.php";;
     esac
-    printf '%s=%s\n' "$key" "$value" >> "$env"
+    run_as sh -c 'printf "%s=%s\n" "$1" "$2" >> .env' sh "$key" "$value"
   done
   ok "Logs in $LOG_DIR, caches and storage in $CACHE_DIR"
 }
@@ -696,14 +701,14 @@ cmd_service() { # restart (start/stop don't apply — the web server + fpm are s
 }
 
 cmd_logs() {
-  # Prefer the app's own log (rotated daily, one file per date); fall back to the Apache vhost error log.
-  local applog; applog="$(ls -1t "$LOG_DIR"/ispconfig-rest-*.log 2>/dev/null | head -n 1 || true)"
+  # Prefer the app's own log (rotated daily, one file per date), read as the run user; fall back to the Apache vhost error log.
+  local applog weblog="/var/log/apache2/${SERVICE_NAME}-error.log"
+  applog="$(run_as sh -c 'ls -1t "$1"/ispconfig-rest-*.log 2>/dev/null | head -n 1' sh "$LOG_DIR" || true)"
   [ -n "$applog" ] || applog="$INSTALL_DIR/storage/logs/laravel.log"
-  local weblog="/var/log/apache2/${SERVICE_NAME}-error.log"
   [ -z "${WEB_SERVICE:-}" ] || weblog="/var/log/${SERVICE_NAME}/web-error.log"
-  if run_as test -f storage/logs/laravel.log; then
-    if [ "${1:-}" = "-f" ]; then run_as tail -f storage/logs/laravel.log
-    else run_as tail -n "${1:-50}" storage/logs/laravel.log; fi
+  if run_as test -f "$applog"; then
+    if [ "${1:-}" = "-f" ]; then run_as tail -f "$applog"
+    else run_as tail -n "${1:-50}" "$applog"; fi
   else
     [ -f "$weblog" ] || die "No log file found ($applog or $weblog)."
     if [ "${1:-}" = "-f" ]; then tail -f "$weblog"; else tail -n "${1:-50}" "$weblog"; fi

@@ -285,16 +285,16 @@ prepare_privileged_extensions() (
   done
 )
 
-# Root runs this from the staged copy with the runtime .env, so it must not leave root-owned files in the
-# runtime log or cache directories: log to stderr, cache in memory, and hand the cache directory back.
+# Root runs this from the staged copy with the runtime .env, so it logs to stderr and caches in memory
+# instead of writing root-owned files into the runtime log and cache directories.
 migrate_privileged() (
   cd "$PRIVILEGED_STAGE/app"
-  status=0
   DB_USERNAME="$DB_ADMIN_USER" DB_PASSWORD="$DB_ADMIN_PASS" LOG_CHANNEL=stderr CACHE_STORE=array \
-    API_EXTENSIONS_PATH="$PRIVILEGED_STAGE/app/extensions" "$PHP_BIN" artisan migrate --force || status=$?
-  chown -R "$RUN_USER":"$RUN_USER" "$CACHE_DIR" 2>/dev/null || true
-  exit "$status"
+    API_EXTENSIONS_PATH="$PRIVILEGED_STAGE/app/extensions" "$PHP_BIN" artisan migrate --force
 )
+
+# Artisan can still write its package manifest into the cache directory when it boots as root.
+restore_cache_owner() { chown -R -h "$RUN_USER":"$RUN_USER" "$CACHE_DIR" 2>/dev/null || true; }
 
 # ---------------------------------------------------------------------------
 # Preflight
@@ -475,13 +475,15 @@ step "Configuring environment"
 ENV_FILE="$INSTALL_DIR/.env"
 # Logs live outside the install tree; the app rotates them itself.
 LOG_DIR="/var/log/ispconfig-rest"
+[ ! -L "$LOG_DIR" ] || die "$LOG_DIR must not be a symlink."
 install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
 ok "Log directory $LOG_DIR"
 # Nothing the app writes at runtime has to live in the install tree: caches and storage go to /var/cache.
 CACHE_DIR="/var/cache/ispconfig-rest"
-install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$CACHE_DIR" "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage" \
-  "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework" "$CACHE_DIR/storage/framework/cache" \
-  "$CACHE_DIR/storage/framework/cache/data" "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
+[ ! -L "$CACHE_DIR" ] || die "$CACHE_DIR must not be a symlink."
+install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$CACHE_DIR"
+run_as mkdir -p "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework/cache/data" \
+  "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
 ok "Cache directory $CACHE_DIR"
 APP_KEY_LINE="$(run_as "$PHP_BIN" -r '
   $env = @file_get_contents(".env");
@@ -538,6 +540,7 @@ write_runtime_env < "$PRIVILEGED_STAGE/app/.env"
 # ---------------------------------------------------------------------------
 step "Creating API-owned tables (privileged login)"
 if migrate_privileged; then MIGRATE_OK=1; else MIGRATE_OK=0; fi
+restore_cache_owner
 if [ "$MIGRATE_OK" = "1" ]; then ok "API-owned tables ready"
 else warn "Privileged migration failed. Provide --db-admin-pass-file (if MySQL root needs a password) or create the table manually, then run 'ispconfig-rest update'."; fi
 
@@ -838,6 +841,7 @@ if [ ${#EXTENSIONS[@]} -gt 0 ]; then
   prepare_privileged_extensions
   if migrate_privileged; then ok "Extension tables ready"
   else warn "Privileged migration failed; run 'ispconfig-rest extension:update' once the database login is fixed."; fi
+  restore_cache_owner
   run_as "$PHP_BIN" artisan config:cache >/dev/null 2>&1 || true
   run_as "$PHP_BIN" artisan route:cache  >/dev/null 2>&1 || true
   "$MANAGER_PATH" restart >/dev/null 2>&1 || true
