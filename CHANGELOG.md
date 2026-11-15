@@ -5,6 +5,14 @@ the HTTP API remains under `/api/v1`.
 
 ## [Unreleased]
 
+## [1.5.0-fork.3] - 2026-11-15
+
+### Fixed
+
+- The installer no longer requires the PHP `phar` extension when Composer is already installed. Only the Composer the
+  installer fetches itself needs it. Nodes that drop `phar` from `php.ini` and load it only for Composer
+  (`php -d extension=phar.so`) failed the preflight with "Missing PHP extensions: phar" before any change.
+
 ## [1.5.0-fork.2] - 2026-11-15
 
 Same application code as 1.5.0-fork.1. The security workflow's HTTP fixture now carries a compatible ISPConfig schema level, so
