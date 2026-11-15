@@ -12,7 +12,7 @@
 #   ispconfig-rest status                 service state, version, DB connectivity
 #   ispconfig-rest restart|start|stop     control the service
 #   ispconfig-rest logs [-f]              service logs
-#   ispconfig-rest doctor                 check the database, ISPConfig schema level, migrations and logs
+#   ispconfig-rest doctor [--log]         check the database, ISPConfig schema level, migrations and logs (--log writes a test entry)
 #   ispconfig-rest key:create NAME [--client-id N] [--acme [--zone Z]...]   mint an API key
 #   ispconfig-rest key:list [--client-id N]     list API keys (never shows secrets)
 #   ispconfig-rest key:revoke ID                  revoke (deactivate) an API key
@@ -353,6 +353,10 @@ ensure_runtime_setup() {
     [ ! -L "$dir" ] || die "$dir must not be a symlink."
     install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$dir"
   done
+  # Logs an older install's root-run commands left behind would keep the run user from appending to them. Regular
+  # files only, and chown -h, so a link planted in the run user's directory is never followed.
+  find "$LOG_DIR" -maxdepth 1 -type f -name 'ispconfig-rest*.log' -exec chown -h "$RUN_USER:$RUN_USER" {} + \
+    || warn "Could not hand the existing logs in $LOG_DIR to $RUN_USER."
   run_as mkdir -p "$CACHE_DIR/bootstrap" "$CACHE_DIR/storage/app" "$CACHE_DIR/storage/framework/cache/data" \
     "$CACHE_DIR/storage/framework/sessions" "$CACHE_DIR/storage/framework/views"
   run_as test -f .env || return 0
@@ -716,7 +720,7 @@ cmd_logs() {
 }
 
 cmd_key_create()    { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:create "$@"; }
-cmd_doctor()       { need_root; run_as "$PHP_BIN" artisan ispconfig:doctor; }
+cmd_doctor()       { need_root; shift || true; run_as "$PHP_BIN" artisan ispconfig:doctor "$@"; }
 cmd_key_list()      { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:list "$@"; }
 cmd_key_revoke()    { need_root; shift || true; run_as "$PHP_BIN" artisan api:key:revoke "$@"; }
 cmd_firewall_allow(){ need_root; shift || true; run_as "$PHP_BIN" artisan firewall:allow "$@"; }
@@ -762,7 +766,7 @@ case "${1:-}" in
   version|-v|--version) cmd_version;;
   start|stop|restart)   cmd_service "$1";;
   logs)          shift; cmd_logs "$@";;
-  doctor)        cmd_doctor;;
+  doctor)        cmd_doctor "$@";;
   key:create)    cmd_key_create "$@";;
   key:list)      cmd_key_list "$@";;
   key:revoke)    cmd_key_revoke "$@";;

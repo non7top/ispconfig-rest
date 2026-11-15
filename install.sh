@@ -489,6 +489,10 @@ ENV_FILE="$INSTALL_DIR/.env"
 LOG_DIR="/var/log/ispconfig-rest"
 [ ! -L "$LOG_DIR" ] || die "$LOG_DIR must not be a symlink."
 install -d -m 0750 -o "$RUN_USER" -g "$RUN_USER" "$LOG_DIR"
+  # Logs an older install's root-run commands left behind would keep the run user from appending to them. Regular
+  # files only, and chown -h, so a link planted in the run user's directory is never followed.
+  find "$LOG_DIR" -maxdepth 1 -type f -name 'ispconfig-rest*.log' -exec chown -h "$RUN_USER:$RUN_USER" {} + \
+    || warn "Could not hand the existing logs in $LOG_DIR to $RUN_USER."
 ok "Log directory $LOG_DIR"
 # Nothing the app writes at runtime has to live in the install tree: caches and storage go to /var/cache.
 CACHE_DIR="/var/cache/ispconfig-rest"

@@ -104,7 +104,7 @@ ispconfig-rest key:create "acme" --client-id 42   # mint a client-scoped key
 ispconfig-rest key:list --client-id 42       # list keys (never shows secrets)
 ispconfig-rest key:revoke 17                 # revoke (deactivate) a key
 ispconfig-rest firewall:allow 8090           # open a port in the ISPConfig firewall
-ispconfig-rest doctor                        # check the database, ISPConfig schema level, migrations and logs
+ispconfig-rest doctor [--log]                # check the database, ISPConfig schema level, migrations and logs; --log also writes a test entry
 ispconfig-rest extension:install hosting     # add an extension (also: extension:update, extension:list, extension:remove)
 ispconfig-rest restart | logs -f | version | uninstall
 ```
