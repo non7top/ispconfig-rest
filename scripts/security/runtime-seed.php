@@ -5,6 +5,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\MailSchema;
+use Tests\Support\ServerSchema;
 use Tests\Support\TenantFixtures;
 use Tests\Support\TenantSchema;
 
@@ -18,8 +19,11 @@ require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 Artisan::call('migrate', ['--force' => true]);
+ServerSchema::create();
 MailSchema::create();
 TenantSchema::create();
+// Writes are refused while the ISPConfig schema level is unknown or too low.
+DB::table('server')->insertOrIgnore(['server_id' => 1, 'server_name' => 'fixture', 'dbversion' => (int) config('api.compat.min_dbversion')]);
 
 $fixtures = new class
 {
